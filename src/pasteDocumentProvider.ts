@@ -6,8 +6,16 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 	private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
 	private openPastes = new Map<string, string>(); // URI string -> paste title
 	private pasteContent = new Map<string, string>(); // paste title -> content
+	private unsyncedFiles = new Set<string>(); // Track files with unsaved changes
+	private autoSaveTimers = new Map<string, NodeJS.Timeout>(); // Document URI -> timeout
+	private autoSaveDelay = 2000; // 2 seconds delay for auto-save
 
-	constructor(private authManager: AuthenticationManager) {}
+	constructor(private authManager: AuthenticationManager) {
+		// Listen for document changes to implement auto-sync
+		vscode.workspace.onDidChangeTextDocument((event) => {
+			this.handleDocumentChange(event);
+		});
+	}
 
 	get onDidChange(): vscode.Event<vscode.Uri> {
 		return this._onDidChange.event;
@@ -41,16 +49,30 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 		return pathParts.length >= 2 ? decodeURIComponent(pathParts[1]) : null;
 	}
 
+	// URI scheme management - different schemes for different document states
 	public createPasteUri(pasteTitle: string): vscode.Uri {
 		return vscode.Uri.parse(`pastepad://paste/${encodeURIComponent(pasteTitle)}`);
 	}
 
+	public createEditableUri(pasteTitle: string): vscode.Uri {
+		return vscode.Uri.parse(`pastepad-edit://paste/${encodeURIComponent(pasteTitle)}`);
+	}
+
+	public createViewUri(pasteTitle: string): vscode.Uri {
+		return vscode.Uri.parse(`pastepad-view://paste/${encodeURIComponent(pasteTitle)}`);
+	}
+
+	public createNewPasteUri(pasteTitle: string): vscode.Uri {
+		return vscode.Uri.parse(`pastepad-new://paste/${encodeURIComponent(pasteTitle)}`);
+	}
+
 	public async openPaste(pasteTitle: string): Promise<vscode.TextEditor | null> {
-		// Check if this paste is already open using a custom scheme
-		const customUriString = `pastepad-edit:${pasteTitle}`;
+		// Check if this paste is already open
 		const existingEditor = vscode.window.visibleTextEditors.find(
-			editor => editor.document.uri.toString().includes(pasteTitle) &&
-			(editor.document.uri.scheme === 'untitled' || editor.document.uri.toString().includes('pastepad-edit'))
+			editor => {
+				const editorPasteTitle = this.getPasteTitle(editor.document.uri);
+				return editorPasteTitle === pasteTitle;
+			}
 		);
 
 		if (existingEditor) {
@@ -106,7 +128,17 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 	}
 
 	public isPasteDocument(uri: vscode.Uri): boolean {
-		return uri.scheme === 'pastepad' && uri.authority === 'paste';
+		return (uri.scheme === 'pastepad' || uri.scheme === 'pastepad-edit' ||
+			uri.scheme === 'pastepad-view' || uri.scheme === 'pastepad-new') &&
+			uri.authority === 'paste';
+	}
+
+	public isEditablePasteDocument(uri: vscode.Uri): boolean {
+		return uri.scheme === 'pastepad-edit' || this.isOpenedPasteDocument(uri);
+	}
+
+	public isViewOnlyPasteDocument(uri: vscode.Uri): boolean {
+		return uri.scheme === 'pastepad-view';
 	}
 
 	public isOpenedPasteDocument(uri: vscode.Uri): boolean {
@@ -122,11 +154,7 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 	}
 
 	public isNewPaste(uri: vscode.Uri): boolean {
-		return uri.scheme === 'untitled' || (uri.scheme === 'pastepad' && uri.authority === 'new');
-	}
-
-	public createNewPasteUri(pasteTitle: string): vscode.Uri {
-		return vscode.Uri.parse(`pastepad://new/${encodeURIComponent(pasteTitle)}`);
+		return uri.scheme === 'untitled' || uri.scheme === 'pastepad-new';
 	}
 
 	public async createNewPaste(pasteTitle: string): Promise<vscode.TextEditor | null> {
@@ -170,7 +198,108 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 		this.openPastes.delete(uri.toString());
 	}
 
+	// Auto-sync functionality
+	private handleDocumentChange(event: vscode.TextDocumentChangeEvent): void {
+		const uri = event.document.uri;
+
+		// Only handle paste documents
+		if (!this.isOpenedPasteDocument(uri) && !this.isEditablePasteDocument(uri)) {
+			return;
+		}
+
+		// Mark as unsynced
+		this.unsyncedFiles.add(uri.toString());
+
+		// Clear existing timer for this document
+		const existingTimer = this.autoSaveTimers.get(uri.toString());
+		if (existingTimer) {
+			clearTimeout(existingTimer);
+		}
+
+		// Set new timer for auto-save
+		const timer = setTimeout(() => {
+			this.autoSaveDocument(event.document);
+		}, this.autoSaveDelay);
+
+		this.autoSaveTimers.set(uri.toString(), timer);
+	}
+
+	private async autoSaveDocument(document: vscode.TextDocument): Promise<void> {
+		try {
+			const pasteTitle = this.getPasteTitle(document.uri);
+			if (!pasteTitle) {
+				return;
+			}
+
+			const content = document.getText();
+
+			// Only auto-save if there are actual changes
+			const cachedContent = this.pasteContent.get(pasteTitle);
+			if (content === cachedContent) {
+				this.unsyncedFiles.delete(document.uri.toString());
+				return;
+			}
+
+			// Perform the save
+			const success = await this.authManager.savePaste(pasteTitle, content);
+
+			if (success) {
+				// Update cached content
+				this.pasteContent.set(pasteTitle, content);
+				// Remove from unsynced files
+				this.unsyncedFiles.delete(document.uri.toString());
+
+				// Show subtle notification
+				vscode.window.setStatusBarMessage(`Auto-saved: ${pasteTitle}`, 2000);
+			} else {
+				// Keep in unsynced state on failure
+				console.warn(`Auto-save failed for paste: ${pasteTitle}`);
+			}
+		} catch (error) {
+			console.error('Auto-save error:', error);
+		} finally {
+			// Clean up timer
+			this.autoSaveTimers.delete(document.uri.toString());
+		}
+	}
+
+	public hasUnsyncedChanges(uri: vscode.Uri): boolean {
+		return this.unsyncedFiles.has(uri.toString());
+	}
+
+	public getUnsyncedFiles(): string[] {
+		return Array.from(this.unsyncedFiles);
+	}
+
+	public async forceSyncDocument(document: vscode.TextDocument): Promise<boolean> {
+		const pasteTitle = this.getPasteTitle(document.uri);
+		if (!pasteTitle) {
+			return false;
+		}
+
+		try {
+			const content = document.getText();
+			const success = await this.authManager.savePaste(pasteTitle, content);
+
+			if (success) {
+				this.pasteContent.set(pasteTitle, content);
+				this.unsyncedFiles.delete(document.uri.toString());
+			}
+
+			return success;
+		} catch (error) {
+			console.error('Force sync error:', error);
+			return false;
+		}
+	}
+
 	public dispose(): void {
+		// Clear all auto-save timers
+		for (const timer of this.autoSaveTimers.values()) {
+			clearTimeout(timer);
+		}
+		this.autoSaveTimers.clear();
+
 		this._onDidChange.dispose();
 		this.clearCache();
 	}

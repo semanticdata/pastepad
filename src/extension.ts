@@ -16,8 +16,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// Initialize pastebin provider
 	const pastebinProvider = new PastebinProvider(authManager);
 
-	// Register the document content provider
+	// Register the document content providers for different URI schemes
 	const documentProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad', pasteDocumentProvider);
+	const editProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-edit', pasteDocumentProvider);
+	const viewProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-view', pasteDocumentProvider);
+	const newProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-new', pasteDocumentProvider);
 
 	// Register the tree data provider
 	const pastebinView = vscode.window.createTreeView('pastepad.pastebin', {
@@ -257,6 +260,43 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	const forceSyncCommand = vscode.commands.registerCommand('pastepad.forceSync', async () => {
+		if (!authManager.isAuthenticated()) {
+			vscode.window.showErrorMessage('Please authenticate first');
+			return;
+		}
+
+		const activeEditor = vscode.window.activeTextEditor;
+		if (!activeEditor) {
+			vscode.window.showErrorMessage('No active editor found');
+			return;
+		}
+
+		if (!pasteDocumentProvider.hasUnsyncedChanges(activeEditor.document.uri)) {
+			vscode.window.showInformationMessage('No unsaved changes to sync');
+			return;
+		}
+
+		try {
+			await vscode.window.withProgress({
+				location: vscode.ProgressLocation.Notification,
+				title: 'Force syncing changes...',
+				cancellable: false
+			}, async () => {
+				const success = await pasteDocumentProvider.forceSyncDocument(activeEditor.document);
+
+				if (success) {
+					vscode.window.showInformationMessage('Changes synced successfully!');
+					updateEditorContext(); // Update context to reflect sync status
+				} else {
+					vscode.window.showErrorMessage('Failed to sync changes');
+				}
+			});
+		} catch (error) {
+			vscode.window.showErrorMessage(`Error syncing changes: ${error}`);
+		}
+	});
+
 	// Update context based on authentication status
 	const updateContext = () => {
 		vscode.commands.executeCommand('setContext', 'pastepad.authenticated', authManager.isAuthenticated());
@@ -267,14 +307,29 @@ export function activate(context: vscode.ExtensionContext) {
 		const activeEditor = vscode.window.activeTextEditor;
 		const isPasteDoc = activeEditor && (
 			pasteDocumentProvider.isOpenedPasteDocument(activeEditor.document.uri) ||
+			pasteDocumentProvider.isPasteDocument(activeEditor.document.uri) ||
 			context.workspaceState.get<string>(`pasteTitle:${activeEditor.document.uri.toString()}`)
 		);
+
+		// Check for unsaved changes
+		const hasUnsyncedChanges = activeEditor && pasteDocumentProvider.hasUnsyncedChanges(activeEditor.document.uri);
+
 		vscode.commands.executeCommand('setContext', 'pastepad.isPasteDocument', !!isPasteDoc);
+		vscode.commands.executeCommand('setContext', 'pastepad.hasUnsyncedChanges', !!hasUnsyncedChanges);
 	};
 
 	// Listen for active editor changes
 	const editorChangeListener = vscode.window.onDidChangeActiveTextEditor(() => {
 		updateEditorContext();
+	});
+
+	// Listen for document changes to update context (for unsaved changes indicator)
+	const documentChangeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+		// Update context if the changed document is the active editor
+		const activeEditor = vscode.window.activeTextEditor;
+		if (activeEditor && activeEditor.document.uri.toString() === event.document.uri.toString()) {
+			updateEditorContext();
+		}
 	});
 
 	// Listen for authentication changes
@@ -295,6 +350,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		documentProviderDisposable,
+		editProviderDisposable,
+		viewProviderDisposable,
+		newProviderDisposable,
 		pastebinView,
 		authenticateCommand,
 		refreshCommand,
@@ -303,9 +361,11 @@ export function activate(context: vscode.ExtensionContext) {
 		newPasteCommand,
 		savePasteCommand,
 		deletePasteCommand,
+		forceSyncCommand,
 		pasteDocumentProvider,
 		documentCloseListener,
-		editorChangeListener
+		editorChangeListener,
+		documentChangeListener
 	);
 }
 

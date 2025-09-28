@@ -52,6 +52,11 @@
         "command": "pastepad.deletePaste",
         "title": "Delete Paste",
         "icon": "$(trash)"
+      },
+      {
+        "command": "pastepad.forceSync",
+        "title": "Force Sync Changes",
+        "icon": "$(sync)"
       }
     ],
     "views": {
@@ -111,7 +116,12 @@
         {
           "command": "pastepad.savePaste",
           "when": "pastepad.isPasteDocument && pastepad.authenticated",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "pastepad.forceSync",
+          "when": "pastepad.isPasteDocument && pastepad.authenticated && pastepad.hasUnsyncedChanges",
+          "group": "navigation@2"
         }
       ]
     },
@@ -120,6 +130,11 @@
         "command": "pastepad.savePaste",
         "key": "ctrl+s",
         "when": "pastepad.isPasteDocument && pastepad.authenticated"
+      },
+      {
+        "command": "pastepad.forceSync",
+        "key": "ctrl+shift+s",
+        "when": "pastepad.isPasteDocument && pastepad.authenticated && pastepad.hasUnsyncedChanges"
       }
     ]
   },
