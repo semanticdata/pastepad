@@ -32,6 +32,11 @@
         "command": "pastepad.logout",
         "title": "Logout",
         "icon": "$(sign-out)"
+      },
+      {
+        "command": "pastepad.openPaste",
+        "title": "Open Paste",
+        "icon": "$(file-text)"
       }
     ],
     "views": {

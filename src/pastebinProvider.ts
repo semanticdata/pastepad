@@ -106,5 +106,12 @@ export class PasteTreeItem extends vscode.TreeItem {
 
 		// Add context value for potential future menu items
 		this.contextValue = 'paste';
+
+		// Make the item clickable by setting the command
+		this.command = {
+			command: 'pastepad.openPaste',
+			title: 'Open Paste',
+			arguments: [this.title]
+		};
 	}
 }

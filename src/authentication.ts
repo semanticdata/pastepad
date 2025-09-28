@@ -117,4 +117,38 @@ export class AuthenticationManager {
 		this.onAuthenticationChangedEmitter.fire();
 		vscode.window.showInformationMessage('Logged out successfully');
 	}
+
+	async fetchPasteContent(pasteTitle: string): Promise<string | null> {
+		if (!this.isAuthenticated()) {
+			return null;
+		}
+
+		try {
+			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/${pasteTitle}`, {
+				headers: {
+					'Authorization': `Bearer ${this.apiKey}`,
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+
+			const data = await response.json() as {
+				request: { success: boolean };
+				response: { paste?: { content: string } };
+			};
+
+			if (data.request.success && data.response.paste) {
+				return data.response.paste.content;
+			}
+
+			return null;
+		} catch (error) {
+			console.error('Error fetching paste content:', error);
+			vscode.window.showErrorMessage(`Failed to fetch paste: ${error}`);
+			return null;
+		}
+	}
 }
