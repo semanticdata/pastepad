@@ -112,6 +112,9 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 			// Track this as an existing paste for save logic
 			this.openPastes.set(document.uri.toString(), pasteTitle);
 
+			// Ensure this document is not marked as unsynced when first opened
+			this.clearUnsyncedState(document.uri);
+
 			// Show the document
 			const editor = await vscode.window.showTextDocument(document, {
 				preview: false,
@@ -207,7 +210,24 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 			return;
 		}
 
-		// Mark as unsynced
+		// Skip if no actual changes were made (contentChanges is empty)
+		if (event.contentChanges.length === 0) {
+			return;
+		}
+
+		// Check if the content actually differs from what we have cached
+		const pasteTitle = this.getPasteTitle(uri);
+		if (pasteTitle) {
+			const currentContent = event.document.getText();
+			const cachedContent = this.pasteContent.get(pasteTitle);
+
+			// If content is the same as cached content, don't mark as unsynced
+			if (currentContent === cachedContent) {
+				return;
+			}
+		}
+
+		// Mark as unsynced only if there are actual changes
 		this.unsyncedFiles.add(uri.toString());
 
 		// Clear existing timer for this document
@@ -236,7 +256,7 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 			// Only auto-save if there are actual changes
 			const cachedContent = this.pasteContent.get(pasteTitle);
 			if (content === cachedContent) {
-				this.unsyncedFiles.delete(document.uri.toString());
+				this.clearUnsyncedState(document.uri);
 				return;
 			}
 
@@ -247,7 +267,7 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 				// Update cached content
 				this.pasteContent.set(pasteTitle, content);
 				// Remove from unsynced files
-				this.unsyncedFiles.delete(document.uri.toString());
+				this.clearUnsyncedState(document.uri);
 
 				// Show subtle notification
 				vscode.window.setStatusBarMessage(`Auto-saved: ${pasteTitle}`, 2000);
@@ -271,6 +291,16 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 		return Array.from(this.unsyncedFiles);
 	}
 
+	public clearUnsyncedState(uri: vscode.Uri): void {
+		this.unsyncedFiles.delete(uri.toString());
+		// Also clear any pending auto-save timer for this document
+		const timer = this.autoSaveTimers.get(uri.toString());
+		if (timer) {
+			clearTimeout(timer);
+			this.autoSaveTimers.delete(uri.toString());
+		}
+	}
+
 	public async forceSyncDocument(document: vscode.TextDocument): Promise<boolean> {
 		const pasteTitle = this.getPasteTitle(document.uri);
 		if (!pasteTitle) {
@@ -283,7 +313,7 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 
 			if (success) {
 				this.pasteContent.set(pasteTitle, content);
-				this.unsyncedFiles.delete(document.uri.toString());
+				this.clearUnsyncedState(document.uri);
 			}
 
 			return success;

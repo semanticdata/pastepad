@@ -194,6 +194,15 @@ export function activate(context: vscode.ExtensionContext) {
 					// Update the document provider cache
 					pasteDocumentProvider.updatePasteContent(title!, content);
 
+					// Clear the unsynced state for this document
+					if (pasteDocumentProvider.hasUnsyncedChanges(document.uri)) {
+						// Force clear the unsynced state
+						pasteDocumentProvider.clearUnsyncedState(document.uri);
+					}
+
+					// Update context to reflect the new sync status
+					updateEditorContext();
+
 					// Refresh the tree view to show the new/updated paste
 					pastebinProvider.refresh();
 
