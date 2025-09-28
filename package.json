@@ -37,6 +37,21 @@
         "command": "pastepad.openPaste",
         "title": "Open Paste",
         "icon": "$(file-text)"
+      },
+      {
+        "command": "pastepad.newPaste",
+        "title": "New Paste",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pastepad.savePaste",
+        "title": "Save Paste",
+        "icon": "$(save)"
+      },
+      {
+        "command": "pastepad.deletePaste",
+        "title": "Delete Paste",
+        "icon": "$(trash)"
       }
     ],
     "views": {
@@ -73,9 +88,40 @@
           "command": "pastepad.logout",
           "when": "view == pastepad.pastebin && pastepad.authenticated",
           "group": "navigation"
+        },
+        {
+          "command": "pastepad.newPaste",
+          "when": "view == pastepad.pastebin && pastepad.authenticated",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pastepad.openPaste",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "inline@1"
+        },
+        {
+          "command": "pastepad.deletePaste",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "inline@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pastepad.savePaste",
+          "when": "pastepad.isPasteDocument && pastepad.authenticated",
+          "group": "navigation"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "pastepad.savePaste",
+        "key": "ctrl+s",
+        "when": "pastepad.isPasteDocument && pastepad.authenticated"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

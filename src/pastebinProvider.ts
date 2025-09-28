@@ -26,7 +26,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 
 	async getChildren(element?: PasteTreeItem): Promise<PasteTreeItem[]> {
 		if (!this.authManager.isAuthenticated()) {
-			return [new PasteTreeItem('Not authenticated', '', 'Click the key icon to authenticate', vscode.TreeItemCollapsibleState.None)];
+			return [new PasteTreeItem('Not authenticated', '', 'Click the key icon to authenticate', vscode.TreeItemCollapsibleState.None, false)];
 		}
 
 		if (this.pastes.length === 0) {
@@ -34,7 +34,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 		}
 
 		if (this.pastes.length === 0) {
-			return [new PasteTreeItem('No pastes found', '', 'Create your first paste at paste.lol', vscode.TreeItemCollapsibleState.None)];
+			return [new PasteTreeItem('No pastes found', '', 'Create your first paste at paste.lol', vscode.TreeItemCollapsibleState.None, false)];
 		}
 
 		return this.pastes.map(paste => {
@@ -45,7 +45,8 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 				paste.title,
 				paste.modified_on,
 				tooltip,
-				vscode.TreeItemCollapsibleState.None
+				vscode.TreeItemCollapsibleState.None,
+				true
 			);
 		});
 	}
@@ -96,7 +97,8 @@ export class PasteTreeItem extends vscode.TreeItem {
 		public readonly title: string,
 		public readonly modifiedOn: string,
 		public readonly tooltip: string,
-		public readonly collapsibleState: vscode.TreeItemCollapsibleState
+		public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+		public readonly isPaste: boolean = true
 	) {
 		super(title, collapsibleState);
 
@@ -104,14 +106,18 @@ export class PasteTreeItem extends vscode.TreeItem {
 		this.description = modifiedOn ? new Date(parseInt(modifiedOn) * 1000).toLocaleDateString() : '';
 		this.iconPath = new vscode.ThemeIcon('file-text');
 
-		// Add context value for potential future menu items
-		this.contextValue = 'paste';
+		// Only set context value and commands for actual paste items
+		if (isPaste) {
+			this.contextValue = 'paste';
 
-		// Make the item clickable by setting the command
-		this.command = {
-			command: 'pastepad.openPaste',
-			title: 'Open Paste',
-			arguments: [this.title]
-		};
+			// Remove the command property to avoid conflicts with inline buttons
+			// The inline open button will handle opening pastes
+
+			// Store the title for use in context menu commands
+			this.resourceUri = vscode.Uri.parse(`pastepad:${this.title}`);
+		} else {
+			// For status messages (not authenticated, no pastes found)
+			this.contextValue = 'status';
+		}
 	}
 }

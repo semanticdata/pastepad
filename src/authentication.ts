@@ -151,4 +151,70 @@ export class AuthenticationManager {
 			return null;
 		}
 	}
+
+	async savePaste(title: string, content: string): Promise<boolean> {
+		if (!this.isAuthenticated()) {
+			return false;
+		}
+
+		try {
+			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/`, {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${this.apiKey}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					title: title,
+					content: content
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+
+			const data = await response.json() as {
+				request: { success: boolean };
+				response: { message?: string };
+			};
+
+			return data.request.success;
+		} catch (error) {
+			console.error('Error saving paste:', error);
+			vscode.window.showErrorMessage(`Failed to save paste: ${error}`);
+			return false;
+		}
+	}
+
+	async deletePaste(title: string): Promise<boolean> {
+		if (!this.isAuthenticated()) {
+			return false;
+		}
+
+		try {
+			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/${title}`, {
+				method: 'DELETE',
+				headers: {
+					'Authorization': `Bearer ${this.apiKey}`,
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+			}
+
+			const data = await response.json() as {
+				request: { success: boolean };
+				response: { message?: string };
+			};
+
+			return data.request.success;
+		} catch (error) {
+			console.error('Error deleting paste:', error);
+			vscode.window.showErrorMessage(`Failed to delete paste: ${error}`);
+			return false;
+		}
+	}
 }
