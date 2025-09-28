@@ -1,26 +1,57 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { AuthenticationManager } from './authentication';
+import { PastebinProvider } from './pastebinProvider';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+	console.log('Pastepad extension activated!');
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "pastepad" is now active!');
+	// Initialize authentication manager
+	const authManager = new AuthenticationManager(context);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('pastepad.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from pastepad!');
+	// Initialize pastebin provider
+	const pastebinProvider = new PastebinProvider(authManager);
+
+	// Register the tree data provider
+	const pastebinView = vscode.window.createTreeView('pastepad.pastebin', {
+		treeDataProvider: pastebinProvider,
+		showCollapseAll: true
 	});
 
-	context.subscriptions.push(disposable);
+	// Register commands
+	const authenticateCommand = vscode.commands.registerCommand('pastepad.authenticate', async () => {
+		await authManager.authenticate();
+		pastebinProvider.refresh();
+	});
+
+	const refreshCommand = vscode.commands.registerCommand('pastepad.refresh', () => {
+		pastebinProvider.refresh();
+	});
+
+	const logoutCommand = vscode.commands.registerCommand('pastepad.logout', async () => {
+		await authManager.logout();
+		pastebinProvider.refresh();
+	});
+
+	// Update context based on authentication status
+	const updateContext = () => {
+		vscode.commands.executeCommand('setContext', 'pastepad.authenticated', authManager.isAuthenticated());
+	};
+
+	// Listen for authentication changes
+	authManager.onAuthenticationChanged(() => {
+		updateContext();
+		pastebinProvider.refresh();
+	});
+
+	// Set initial context
+	updateContext();
+
+	context.subscriptions.push(
+		pastebinView,
+		authenticateCommand,
+		refreshCommand,
+		logoutCommand
+	);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}

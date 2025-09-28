@@ -1,23 +1,76 @@
 {
   "name": "pastepad",
   "displayName": "pastepad",
-  "description": "Access your paste.lol pastebin from VS Code.",
+  "description": "Access and manage your omg.lol pastebin from VS Code.",
   "version": "0.0.1",
+  "publisher": "semanticdata",
+  "repository": "https://github.com/microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {
     "vscode": "^1.104.0"
   },
   "categories": [
+    "Snippets",
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:pastepad.pastebin"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "pastepad.helloWorld",
-        "title": "Hello World"
+        "command": "pastepad.authenticate",
+        "title": "Authenticate with omg.lol",
+        "icon": "$(key)"
+      },
+      {
+        "command": "pastepad.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pastepad.logout",
+        "title": "Logout",
+        "icon": "$(sign-out)"
       }
-    ]
+    ],
+    "views": {
+      "pastepad": [
+        {
+          "id": "pastepad.pastebin",
+          "name": "Pastebin",
+          "when": "true"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pastepad",
+          "title": "Pastepad",
+          "icon": "$(file-text)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "pastepad.authenticate",
+          "when": "view == pastepad.pastebin && !pastepad.authenticated",
+          "group": "navigation"
+        },
+        {
+          "command": "pastepad.refresh",
+          "when": "view == pastepad.pastebin && pastepad.authenticated",
+          "group": "navigation"
+        },
+        {
+          "command": "pastepad.logout",
+          "when": "view == pastepad.pastebin && pastepad.authenticated",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
