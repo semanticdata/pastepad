@@ -13,7 +13,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:pastepad.pastebin"
+    "onView:pastepad.pastebin",
+    "onUri"
   ],
   "main": "./dist/extension.js",
   "contributes": {

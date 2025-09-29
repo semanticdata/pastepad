@@ -1,37 +1,46 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
+import { OmgLolApi } from './api';
 import { PastebinProvider } from './pastebinProvider';
-import { getLanguageFromTitle, getFileNameFromTitle } from './languageDetection';
 import { PasteDocumentProvider } from './pasteDocumentProvider';
+
+class PastepadUriHandler implements vscode.UriHandler {
+    constructor(private authManager: AuthenticationManager) {}
+
+    public async handleUri(uri: vscode.Uri) {
+        if (uri.path === '/authenticate') {
+            const query = new URLSearchParams(uri.query);
+            const code = query.get('code');
+            const state = query.get('state');
+
+            if (code && state) {
+                await this.authManager.handleAuthorizationCode(code, state);
+            }
+        }
+    }
+}
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Pastepad extension activated!');
 
-	// Initialize authentication manager
 	const authManager = new AuthenticationManager(context);
+    const api = new OmgLolApi(authManager);
 
-	// Initialize document provider
-	const pasteDocumentProvider = new PasteDocumentProvider(authManager);
+    const uriHandler = new PastepadUriHandler(authManager);
+    context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 
-	// Initialize pastebin provider
-	const pastebinProvider = new PastebinProvider(authManager);
+	const pasteDocumentProvider = new PasteDocumentProvider(api);
+	const pastebinProvider = new PastebinProvider(api, authManager);
 
-	// Register the document content providers for different URI schemes
-	const documentProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad', pasteDocumentProvider);
-	const editProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-edit', pasteDocumentProvider);
-	const viewProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-view', pasteDocumentProvider);
-	const newProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('pastepad-new', pasteDocumentProvider);
+	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('pastepad', pasteDocumentProvider));
 
-	// Register the tree data provider
 	const pastebinView = vscode.window.createTreeView('pastepad.pastebin', {
 		treeDataProvider: pastebinProvider,
 		showCollapseAll: true
 	});
 
-	// Register commands
 	const authenticateCommand = vscode.commands.registerCommand('pastepad.authenticate', async () => {
 		await authManager.authenticate();
-		pastebinProvider.refresh();
 	});
 
 	const refreshCommand = vscode.commands.registerCommand('pastepad.refresh', () => {
@@ -41,18 +50,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const logoutCommand = vscode.commands.registerCommand('pastepad.logout', async () => {
 		await authManager.logout();
-		pasteDocumentProvider.clearCache();
-		pastebinProvider.refresh();
 	});
 
 	const openPasteCommand = vscode.commands.registerCommand('pastepad.openPaste', async (pasteTitleOrTreeItem: string | any) => {
-		if (!authManager.isAuthenticated()) {
+		if (!await authManager.isAuthenticated()) {
 			vscode.window.showErrorMessage('Please authenticate first');
 			return;
 		}
 
 		try {
-			// Handle both string title and tree item object
 			const pasteTitle = typeof pasteTitleOrTreeItem === 'string'
 				? pasteTitleOrTreeItem
 				: pasteTitleOrTreeItem?.title || pasteTitleOrTreeItem?.label;
@@ -62,7 +68,6 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 
-			// Show loading message
 			await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
 				title: `Loading paste: ${pasteTitle}`,
@@ -77,304 +82,81 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const newPasteCommand = vscode.commands.registerCommand('pastepad.newPaste', async () => {
-		if (!authManager.isAuthenticated()) {
+		if (!await authManager.isAuthenticated()) {
 			vscode.window.showErrorMessage('Please authenticate first');
 			return;
 		}
 
-		try {
-			// Prompt for paste title
-			const title = await vscode.window.showInputBox({
-				prompt: 'Enter the title for your new paste',
-				placeHolder: 'e.g., my-script.py',
-				validateInput: (value) => {
-					if (!value || value.trim().length === 0) {
-						return 'Title is required';
-					}
-					// Basic validation for valid filename characters
-					if (!/^[a-zA-Z0-9._-]+$/.test(value)) {
-						return 'Title can only contain letters, numbers, dots, hyphens, and underscores';
-					}
-					return null;
-				}
-			});
+        const title = await vscode.window.showInputBox({ prompt: 'Enter a title for the new paste' });
+        if (!title) {
+            return;
+        }
 
-			if (!title) {
-				return;
-			}
+        const content = await vscode.window.showInputBox({ prompt: 'Enter the content for the new paste' });
+        if (content === undefined) {
+            return;
+        }
 
-			// Create the new paste document
-			const editor = await pasteDocumentProvider.createNewPaste(title);
+        const success = await pasteDocumentProvider.createPaste(title, content);
+        if (success) {
+            pastebinProvider.refresh();
+            vscode.window.showInformationMessage(`Paste "${title}" created successfully!`);
+        }
+    });
 
-			if (editor) {
-				// Store the paste title for later saving
-				context.workspaceState.update(`pasteTitle:${editor.document.uri.toString()}`, title);
-				vscode.window.showInformationMessage(`New paste "${title}" created. Start typing and save when ready.`);
-			}
+    const savePasteCommand = vscode.commands.registerCommand('pastepad.savePaste', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
 
-		} catch (error) {
-			vscode.window.showErrorMessage(`Error creating new paste: ${error}`);
-		}
-	});
+        const success = await pasteDocumentProvider.savePaste(editor.document);
+        if (success) {
+            vscode.window.showInformationMessage('Paste saved successfully!');
+        }
+    });
 
-	const savePasteCommand = vscode.commands.registerCommand('pastepad.savePaste', async () => {
-		if (!authManager.isAuthenticated()) {
-			vscode.window.showErrorMessage('Please authenticate first');
-			return;
-		}
+    const deletePasteCommand = vscode.commands.registerCommand('pastepad.deletePaste', async (item: any) => {
+        const title = item.title;
+        if (!title) {
+            return;
+        }
 
-		const activeEditor = vscode.window.activeTextEditor;
-		if (!activeEditor) {
-			vscode.window.showErrorMessage('No active editor found');
-			return;
-		}
+        const confirmation = await vscode.window.showWarningMessage(`Are you sure you want to delete "${title}"?`, { modal: true }, 'Delete');
+        if (confirmation !== 'Delete') {
+            return;
+        }
 
-		const document = activeEditor.document;
-		const content = document.getText();
+        try {
+            await api.deletePaste(title);
+            pastebinProvider.refresh();
+            vscode.window.showInformationMessage(`Paste "${title}" deleted successfully!`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to delete paste: ${error}`);
+        }
+    });
 
-		try {
-			let title: string | undefined;
-			let isUpdate = false;
-
-			// Check if this is an existing paste document
-			if (pasteDocumentProvider.isPasteDocument(document.uri) || pasteDocumentProvider.isOpenedPasteDocument(document.uri)) {
-				title = pasteDocumentProvider.getPasteTitle(document.uri) || undefined;
-				isUpdate = true;
-			} else if (document.uri.scheme === 'untitled') {
-				// Check if we have a stored paste title for new pastes
-				title = context.workspaceState.get<string>(`pasteTitle:${document.uri.toString()}`);
-			}
-
-			if (!title) {
-				// Prompt for title if not found
-				title = await vscode.window.showInputBox({
-					prompt: 'Enter the title for this paste',
-					placeHolder: 'e.g., my-script.py',
-					validateInput: (value) => {
-						if (!value || value.trim().length === 0) {
-							return 'Title is required';
-						}
-						if (!/^[a-zA-Z0-9._-]+$/.test(value)) {
-							return 'Title can only contain letters, numbers, dots, hyphens, and underscores';
-						}
-						return null;
-					}
-				});
-
-				if (!title) {
-					return;
-				}
-			}
-
-			// If this is an update to an existing paste, confirm the action
-			if (isUpdate) {
-				const confirmation = await vscode.window.showInformationMessage(
-					`Update existing paste "${title}"?`,
-					{ modal: true },
-					'Update',
-					'Cancel'
-				);
-
-				if (confirmation !== 'Update') {
-					return;
-				}
-			}
-
-			// Save the paste
-			await vscode.window.withProgress({
-				location: vscode.ProgressLocation.Notification,
-				title: `${isUpdate ? 'Updating' : 'Saving'} paste: ${title}`,
-				cancellable: false
-			}, async () => {
-				const success = await authManager.savePaste(title!, content);
-
-				if (success) {
-					vscode.window.showInformationMessage(`Paste "${title}" ${isUpdate ? 'updated' : 'saved'} successfully!`);
-
-					// Update the document provider cache
-					pasteDocumentProvider.updatePasteContent(title!, content);
-
-					// Clear the unsynced state for this document
-					if (pasteDocumentProvider.hasUnsyncedChanges(document.uri)) {
-						// Force clear the unsynced state
-						pasteDocumentProvider.clearUnsyncedState(document.uri);
-					}
-
-					// Update context to reflect the new sync status
-					updateEditorContext();
-
-					// Refresh the tree view to show the new/updated paste
-					pastebinProvider.refresh();
-
-					// Clean up stored title for new pastes
-					if (!isUpdate) {
-						context.workspaceState.update(`pasteTitle:${document.uri.toString()}`, undefined);
-					}
-				} else {
-					vscode.window.showErrorMessage(`Failed to ${isUpdate ? 'update' : 'save'} paste "${title}"`);
-				}
-			});
-
-		} catch (error) {
-			vscode.window.showErrorMessage(`Error saving paste: ${error}`);
-		}
-	});
-
-	const deletePasteCommand = vscode.commands.registerCommand('pastepad.deletePaste', async (treeItem?: any) => {
-		if (!authManager.isAuthenticated()) {
-			vscode.window.showErrorMessage('Please authenticate first');
-			return;
-		}
-
-		try {
-			// Get the paste title from the tree item
-			const pasteTitle = treeItem?.title || treeItem?.label;
-
-			if (!pasteTitle) {
-				vscode.window.showErrorMessage('Unable to determine paste title');
-				return;
-			}
-
-			// Confirm deletion
-			const confirmation = await vscode.window.showWarningMessage(
-				`Are you sure you want to delete the paste "${pasteTitle}"?`,
-				{ modal: true },
-				'Delete',
-				'Cancel'
-			);
-
-			if (confirmation !== 'Delete') {
-				return;
-			}
-
-			// Delete the paste
-			await vscode.window.withProgress({
-				location: vscode.ProgressLocation.Notification,
-				title: `Deleting paste: ${pasteTitle}`,
-				cancellable: false
-			}, async () => {
-				const success = await authManager.deletePaste(pasteTitle);
-
-				if (success) {
-					vscode.window.showInformationMessage(`Paste "${pasteTitle}" deleted successfully!`);
-					// Refresh the tree view to remove the deleted paste
-					pastebinProvider.refresh();
-				} else {
-					vscode.window.showErrorMessage(`Failed to delete paste "${pasteTitle}"`);
-				}
-			});
-
-		} catch (error) {
-			vscode.window.showErrorMessage(`Error deleting paste: ${error}`);
-		}
-	});
-
-	const forceSyncCommand = vscode.commands.registerCommand('pastepad.forceSync', async () => {
-		if (!authManager.isAuthenticated()) {
-			vscode.window.showErrorMessage('Please authenticate first');
-			return;
-		}
-
-		const activeEditor = vscode.window.activeTextEditor;
-		if (!activeEditor) {
-			vscode.window.showErrorMessage('No active editor found');
-			return;
-		}
-
-		if (!pasteDocumentProvider.hasUnsyncedChanges(activeEditor.document.uri)) {
-			vscode.window.showInformationMessage('No unsaved changes to sync');
-			return;
-		}
-
-		try {
-			await vscode.window.withProgress({
-				location: vscode.ProgressLocation.Notification,
-				title: 'Force syncing changes...',
-				cancellable: false
-			}, async () => {
-				const success = await pasteDocumentProvider.forceSyncDocument(activeEditor.document);
-
-				if (success) {
-					vscode.window.showInformationMessage('Changes synced successfully!');
-					updateEditorContext(); // Update context to reflect sync status
-				} else {
-					vscode.window.showErrorMessage('Failed to sync changes');
-				}
-			});
-		} catch (error) {
-			vscode.window.showErrorMessage(`Error syncing changes: ${error}`);
-		}
-	});
-
-	// Update context based on authentication status
-	const updateContext = () => {
-		vscode.commands.executeCommand('setContext', 'pastepad.authenticated', authManager.isAuthenticated());
+	const updateContext = async () => {
+		vscode.commands.executeCommand('setContext', 'pastepad.authenticated', await authManager.isAuthenticated());
 	};
 
-	// Update context when active editor changes to detect paste documents
-	const updateEditorContext = () => {
-		const activeEditor = vscode.window.activeTextEditor;
-		const isPasteDoc = activeEditor && (
-			pasteDocumentProvider.isOpenedPasteDocument(activeEditor.document.uri) ||
-			pasteDocumentProvider.isPasteDocument(activeEditor.document.uri) ||
-			context.workspaceState.get<string>(`pasteTitle:${activeEditor.document.uri.toString()}`)
-		);
-
-		// Check for unsaved changes
-		const hasUnsyncedChanges = activeEditor && pasteDocumentProvider.hasUnsyncedChanges(activeEditor.document.uri);
-
-		vscode.commands.executeCommand('setContext', 'pastepad.isPasteDocument', !!isPasteDoc);
-		vscode.commands.executeCommand('setContext', 'pastepad.hasUnsyncedChanges', !!hasUnsyncedChanges);
-	};
-
-	// Listen for active editor changes
-	const editorChangeListener = vscode.window.onDidChangeActiveTextEditor(() => {
-		updateEditorContext();
-	});
-
-	// Listen for document changes to update context (for unsaved changes indicator)
-	const documentChangeListener = vscode.workspace.onDidChangeTextDocument((event) => {
-		// Update context if the changed document is the active editor
-		const activeEditor = vscode.window.activeTextEditor;
-		if (activeEditor && activeEditor.document.uri.toString() === event.document.uri.toString()) {
-			updateEditorContext();
-		}
-	});
-
-	// Listen for authentication changes
 	authManager.onAuthenticationChanged(() => {
 		updateContext();
 		pasteDocumentProvider.clearCache();
 		pastebinProvider.refresh();
 	});
 
-	// Set initial context
 	updateContext();
-	updateEditorContext();
-
-	// Listen for document close events to clean up paste tracking
-	const documentCloseListener = vscode.workspace.onDidCloseTextDocument((document) => {
-		pasteDocumentProvider.removePasteTracking(document.uri);
-	});
 
 	context.subscriptions.push(
-		documentProviderDisposable,
-		editProviderDisposable,
-		viewProviderDisposable,
-		newProviderDisposable,
 		pastebinView,
 		authenticateCommand,
 		refreshCommand,
 		logoutCommand,
 		openPasteCommand,
 		newPasteCommand,
-		savePasteCommand,
-		deletePasteCommand,
-		forceSyncCommand,
-		pasteDocumentProvider,
-		documentCloseListener,
-		editorChangeListener,
-		documentChangeListener
+        savePasteCommand,
+        deletePasteCommand
 	);
 }
 

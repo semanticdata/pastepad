@@ -1,220 +1,184 @@
 import * as vscode from 'vscode';
+import { URLSearchParams } from 'url';
+
+// IMPORTANT: Replace with your actual client ID and secret
+const OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID';
+const OAUTH_CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+
+const OAUTH_AUTHORIZATION_URL = 'https://api.omg.lol/oauth/authorize';
+const OAUTH_TOKEN_URL = 'https://api.omg.lol/oauth/token';
+const REDIRECT_URI = 'vscode://semanticdata.pastepad/authenticate';
+
+const AUTH_METHOD_KEY = 'omglol.authMethod';
+const API_KEY = 'omglol.apiKey';
+const ACCESS_TOKEN_KEY = 'omglol.accessToken';
+const REFRESH_TOKEN_KEY = 'omglol.refreshToken';
+const ADDRESS_KEY = 'omglol.address';
+
+type AuthMethod = 'oauth' | 'apikey';
+
+interface TokenResponse {
+    response: {
+        access_token: string;
+        refresh_token: string;
+        address: string;
+    };
+}
 
 export class AuthenticationManager {
-	private readonly STORAGE_KEY = 'omglol.apiKey';
-	private readonly ADDRESS_KEY = 'omglol.address';
-	private apiKey: string | undefined;
-	private address: string | undefined;
-	private onAuthenticationChangedEmitter = new vscode.EventEmitter<void>();
+    private onAuthenticationChangedEmitter = new vscode.EventEmitter<void>();
 
-	constructor(private context: vscode.ExtensionContext) {
-		this.loadCredentials();
-	}
+    constructor(private context: vscode.ExtensionContext) {}
 
-	get onAuthenticationChanged(): vscode.Event<void> {
-		return this.onAuthenticationChangedEmitter.event;
-	}
+    get onAuthenticationChanged(): vscode.Event<void> {
+        return this.onAuthenticationChangedEmitter.event;
+    }
 
-	private async loadCredentials(): Promise<void> {
-		this.apiKey = await this.context.secrets.get(this.STORAGE_KEY);
-		this.address = await this.context.secrets.get(this.ADDRESS_KEY);
-	}
+    async authenticate(): Promise<void> {
+        const selection = await vscode.window.showQuickPick([
+            { label: 'Sign in with OAuth', description: 'Recommended, most secure' },
+            { label: 'Sign in with API Key', description: 'Less secure' }
+        ]);
 
-	async authenticate(): Promise<void> {
-		try {
-			// Get omg.lol address
-			const address = await vscode.window.showInputBox({
-				prompt: 'Enter your omg.lol address (without @omg.lol)',
-				placeHolder: 'e.g., yourname',
-				validateInput: (value) => {
-					if (!value || value.trim().length === 0) {
-						return 'Address is required';
-					}
-					if (value.includes('@') || value.includes('.')) {
-						return 'Enter only the address part (without @omg.lol)';
-					}
-					return null;
-				}
-			});
+        if (!selection) {
+            return;
+        }
 
-			if (!address) {
-				return;
-			}
+        if (selection.label === 'Sign in with OAuth') {
+            await this.authenticateWithOAuth();
+        } else {
+            await this.authenticateWithApiKey();
+        }
+    }
 
-			// Get API key
-			const apiKey = await vscode.window.showInputBox({
-				prompt: 'Enter your omg.lol API key',
-				placeHolder: 'Your API key from omg.lol settings',
-				password: true,
-				validateInput: (value) => {
-					if (!value || value.trim().length === 0) {
-						return 'API key is required';
-					}
-					return null;
-				}
-			});
+    private async authenticateWithOAuth(): Promise<void> {
+        const state = Date.now().toString();
+        this.context.globalState.update('oauthState', state);
 
-			if (!apiKey) {
-				return;
-			}
+        const searchParams = new URLSearchParams({
+            client_id: OAUTH_CLIENT_ID,
+            redirect_uri: REDIRECT_URI,
+            response_type: 'code',
+            state: state,
+        });
 
-			// Test the credentials
-			const isValid = await this.testCredentials(address.trim(), apiKey.trim());
+        const uri = vscode.Uri.parse(`${OAUTH_AUTHORIZATION_URL}?${searchParams.toString()}`);
+        vscode.env.openExternal(uri);
+    }
 
-			if (!isValid) {
-				vscode.window.showErrorMessage('Invalid credentials. Please check your address and API key.');
-				return;
-			}
+    private async authenticateWithApiKey(): Promise<void> {
+        const address = await vscode.window.showInputBox({ 
+            prompt: 'Enter your omg.lol address',
+            validateInput: (value) => {
+                if (!value || value.trim().length === 0) {
+                    return 'Address is required';
+                }
+                if (value.includes('@') || value.includes('.')) {
+                    return "Enter only the address part (e.g., 'yourname')";
+                }
+                return null;
+            }
+        });
+        if (!address) {
+            return;
+        }
 
-			// Store credentials securely
-			await this.context.secrets.store(this.STORAGE_KEY, apiKey.trim());
-			await this.context.secrets.store(this.ADDRESS_KEY, address.trim());
+        const apiKey = await vscode.window.showInputBox({ prompt: 'Enter your omg.lol API Key', password: true });
+        if (!apiKey) {
+            return;
+        }
 
-			this.apiKey = apiKey.trim();
-			this.address = address.trim();
+        // A simple test to see if the credentials are valid
+        try {
+            const response = await fetch(`https://api.omg.lol/address/${address}/info`, {
+                headers: { 'Authorization': `Bearer ${apiKey}` }
+            });
+            if (!response.ok) {
+                vscode.window.showErrorMessage('Invalid address or API Key.');
+                return;
+            }
+        } catch (e) {
+            vscode.window.showErrorMessage('Failed to validate API Key.');
+            return;
+        }
 
-			vscode.window.showInformationMessage('Successfully authenticated with omg.lol!');
-			this.onAuthenticationChangedEmitter.fire();
+        await this.context.secrets.store(AUTH_METHOD_KEY, 'apikey');
+        await this.context.secrets.store(ADDRESS_KEY, address);
+        await this.context.secrets.store(API_KEY, apiKey);
+        this.onAuthenticationChangedEmitter.fire();
+        vscode.window.showInformationMessage('Successfully authenticated with API Key!');
+    }
 
-		} catch (error) {
-			vscode.window.showErrorMessage(`Authentication failed: ${error}`);
-		}
-	}
+    async handleAuthorizationCode(code: string, state: string): Promise<void> {
+        const savedState = this.context.globalState.get<string>('oauthState');
+        if (state !== savedState) {
+            vscode.window.showErrorMessage('Invalid OAuth state. Please try again.');
+            return;
+        }
 
-	private async testCredentials(address: string, apiKey: string): Promise<boolean> {
-		try {
-			const response = await fetch(`https://api.omg.lol/address/${address}/pastebin`, {
-				headers: {
-					'Authorization': `Bearer ${apiKey}`,
-					'Content-Type': 'application/json'
-				}
-			});
+        try {
+            const response = await fetch(OAUTH_TOKEN_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    grant_type: 'authorization_code',
+                    client_id: OAUTH_CLIENT_ID,
+                    client_secret: OAUTH_CLIENT_SECRET,
+                    code: code,
+                    redirect_uri: REDIRECT_URI,
+                }),
+            });
 
-			return response.ok;
-		} catch (error) {
-			console.error('Error testing credentials:', error);
-			return false;
-		}
-	}
+            if (!response.ok) {
+                throw new Error(`Failed to get access token: ${await response.text()}`);
+            }
 
-	isAuthenticated(): boolean {
-		return !!(this.apiKey && this.address);
-	}
+            const data = await response.json() as TokenResponse;
+            const { access_token, refresh_token, address } = data.response;
 
-	getApiKey(): string | undefined {
-		return this.apiKey;
-	}
+            await this.context.secrets.store(AUTH_METHOD_KEY, 'oauth');
+            await this.context.secrets.store(ACCESS_TOKEN_KEY, access_token);
+            await this.context.secrets.store(REFRESH_TOKEN_KEY, refresh_token);
+            await this.context.secrets.store(ADDRESS_KEY, address);
 
-	getAddress(): string | undefined {
-		return this.address;
-	}
+            this.onAuthenticationChangedEmitter.fire();
+            vscode.window.showInformationMessage('Successfully authenticated with omg.lol!');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Authentication failed: ${error}`);
+        }
+    }
 
-	async logout(): Promise<void> {
-		await this.context.secrets.delete(this.STORAGE_KEY);
-		await this.context.secrets.delete(this.ADDRESS_KEY);
-		this.apiKey = undefined;
-		this.address = undefined;
-		this.onAuthenticationChangedEmitter.fire();
-		vscode.window.showInformationMessage('Logged out successfully');
-	}
+    async isAuthenticated(): Promise<boolean> {
+        const authMethod = await this.context.secrets.get(AUTH_METHOD_KEY);
+        if (authMethod === 'oauth') {
+            return !!(await this.context.secrets.get(ACCESS_TOKEN_KEY));
+        } else if (authMethod === 'apikey') {
+            return !!(await this.context.secrets.get(API_KEY));
+        }
+        return false;
+    }
 
-	async fetchPasteContent(pasteTitle: string): Promise<string | null> {
-		if (!this.isAuthenticated()) {
-			return null;
-		}
+    async getAccessToken(): Promise<string | undefined> {
+        const authMethod = await this.context.secrets.get(AUTH_METHOD_KEY);
+        if (authMethod === 'oauth') {
+            return await this.context.secrets.get(ACCESS_TOKEN_KEY);
+        } else if (authMethod === 'apikey') {
+            return await this.context.secrets.get(API_KEY);
+        }
+        return undefined;
+    }
 
-		try {
-			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/${pasteTitle}`, {
-				headers: {
-					'Authorization': `Bearer ${this.apiKey}`,
-					'Content-Type': 'application/json'
-				}
-			});
+    async getAddress(): Promise<string | undefined> {
+        return await this.context.secrets.get(ADDRESS_KEY);
+    }
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
-
-			const data = await response.json() as {
-				request: { success: boolean };
-				response: { paste?: { content: string } };
-			};
-
-			if (data.request.success && data.response.paste) {
-				return data.response.paste.content;
-			}
-
-			return null;
-		} catch (error) {
-			console.error('Error fetching paste content:', error);
-			vscode.window.showErrorMessage(`Failed to fetch paste: ${error}`);
-			return null;
-		}
-	}
-
-	async savePaste(title: string, content: string): Promise<boolean> {
-		if (!this.isAuthenticated()) {
-			return false;
-		}
-
-		try {
-			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/`, {
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${this.apiKey}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					title: title,
-					content: content
-				})
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
-
-			const data = await response.json() as {
-				request: { success: boolean };
-				response: { message?: string };
-			};
-
-			return data.request.success;
-		} catch (error) {
-			console.error('Error saving paste:', error);
-			vscode.window.showErrorMessage(`Failed to save paste: ${error}`);
-			return false;
-		}
-	}
-
-	async deletePaste(title: string): Promise<boolean> {
-		if (!this.isAuthenticated()) {
-			return false;
-		}
-
-		try {
-			const response = await fetch(`https://api.omg.lol/address/${this.address}/pastebin/${title}`, {
-				method: 'DELETE',
-				headers: {
-					'Authorization': `Bearer ${this.apiKey}`,
-					'Content-Type': 'application/json'
-				}
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
-
-			const data = await response.json() as {
-				request: { success: boolean };
-				response: { message?: string };
-			};
-
-			return data.request.success;
-		} catch (error) {
-			console.error('Error deleting paste:', error);
-			vscode.window.showErrorMessage(`Failed to delete paste: ${error}`);
-			return false;
-		}
-	}
+    async logout(): Promise<void> {
+        await this.context.secrets.delete(AUTH_METHOD_KEY);
+        await this.context.secrets.delete(API_KEY);
+        await this.context.secrets.delete(ACCESS_TOKEN_KEY);
+        await this.context.secrets.delete(REFRESH_TOKEN_KEY);
+        await this.context.secrets.delete(ADDRESS_KEY);
+        this.onAuthenticationChangedEmitter.fire();
+        vscode.window.showInformationMessage('Logged out successfully');
+    }
 }
