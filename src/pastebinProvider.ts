@@ -1,17 +1,15 @@
 import * as vscode from 'vscode';
 import { OmgLolApi } from './api';
 import { PasteItem } from './types';
+import { AuthenticationManager } from './authentication';
 
 export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> {
 	private _onDidChangeTreeData: vscode.EventEmitter<PasteTreeItem | undefined | null | void> = new vscode.EventEmitter<PasteTreeItem | undefined | null | void>();
 	readonly onDidChangeTreeData: vscode.Event<PasteTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-	private pastes: PasteItem[] = [];
-
-	constructor(private api: OmgLolApi, private authManager: any) {}
+	constructor(private api: OmgLolApi, private authManager: AuthenticationManager) {}
 
 	refresh(): void {
-		this.loadPastes();
 		this._onDidChangeTreeData.fire();
 	}
 
@@ -24,42 +22,30 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 			return [new PasteTreeItem('Not authenticated', '', 'Click the key icon to authenticate', vscode.TreeItemCollapsibleState.None, false)];
 		}
 
-		if (this.pastes.length === 0) {
-			await this.loadPastes();
-		}
+        try {
+            const pastes = await this.api.getPastes();
+            if (pastes.length === 0) {
+                return [new PasteTreeItem('No pastes found', '', 'Create your first paste at paste.lol', vscode.TreeItemCollapsibleState.None, false)];
+            }
 
-		if (this.pastes.length === 0) {
-			return [new PasteTreeItem('No pastes found', '', 'Create your first paste at paste.lol', vscode.TreeItemCollapsibleState.None, false)];
-		}
+            pastes.sort((a, b) => parseInt(b.modified_on) - parseInt(a.modified_on));
 
-		return this.pastes.map(paste => {
-			const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
-			const tooltip = `Modified: ${modifiedDate.toLocaleString()}\n\nContent preview:\n${paste.content.substring(0, 200)}${paste.content.length > 200 ? '...' : ''}`;
-
-			return new PasteTreeItem(
-				paste.title,
-				paste.modified_on,
-				tooltip,
-				vscode.TreeItemCollapsibleState.None,
-				true
-			);
-		});
-	}
-
-	private async loadPastes(): Promise<void> {
-		if (!await this.authManager.isAuthenticated()) {
-			return;
-		}
-
-		try {
-            this.pastes = await this.api.getPastes();
-			// Sort by modification date (newest first)
-			this.pastes.sort((a, b) => parseInt(b.modified_on) - parseInt(a.modified_on));
-		} catch (error) {
-			console.error('Error loading pastes:', error);
-			vscode.window.showErrorMessage(`Failed to load pastes: ${error}`);
-			this.pastes = [];
-		}
+            return pastes.map(paste => {
+                const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
+                const tooltip = `Modified: ${modifiedDate.toLocaleString()}`;
+    
+                return new PasteTreeItem(
+                    paste.title,
+                    paste.modified_on,
+                    tooltip,
+                    vscode.TreeItemCollapsibleState.None,
+                    true
+                );
+            });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load pastes: ${error}`);
+            return [];
+        }
 	}
 }
 
@@ -79,7 +65,11 @@ export class PasteTreeItem extends vscode.TreeItem {
 
 		if (isPaste) {
 			this.contextValue = 'paste';
-			this.resourceUri = vscode.Uri.parse(`pastepad:${this.title}`);
+            this.command = {
+                command: 'pastepad.openPaste',
+                title: 'Open Paste',
+                arguments: [this]
+            };
 		} else {
 			this.contextValue = 'status';
 		}
