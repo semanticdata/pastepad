@@ -30,6 +30,26 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 			return [new PasteTreeItem('Not authenticated', '', 'Click the key icon to authenticate', vscode.TreeItemCollapsibleState.None, false)];
 		}
 
+		// If this is a group element, return its children
+		if (element && element.itemType === 'group' && element.children) {
+			return element.children.map(paste => {
+				const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
+				const isListed = paste.listed === 1 || paste.listed === '1';
+				const visibilityIcon = isListed ? '🌐' : '🔒';
+				const tooltip = `${visibilityIcon} ${isListed ? 'Public' : 'Private'} • Modified: ${modifiedDate.toLocaleString()}`;
+
+				return new PasteTreeItem(
+					paste.title,
+					paste.modified_on,
+					tooltip,
+					vscode.TreeItemCollapsibleState.None,
+					true,
+					paste,
+					'paste'
+				);
+			});
+		}
+
 		try {
 			// Get user preferences for sorting
 			const preferences = await this.stateManager.getUserPreferences();
@@ -51,21 +71,29 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 				return [new PasteTreeItem(message, '', description, vscode.TreeItemCollapsibleState.None, false)];
 			}
 
-			// Apply sorting based on user preferences
-			const sortedPastes = this.sortPastes(pastes, sortBy);
+			// Check if we should group by visibility
+			if (preferences.groupPastesByVisibility) {
+				return this.createGroupedTreeItems(pastes, sortBy);
+			} else {
+				// Apply sorting based on user preferences
+				const sortedPastes = this.sortPastes(pastes, sortBy);
 
-			return sortedPastes.map(paste => {
-				const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
-				const tooltip = `Modified: ${modifiedDate.toLocaleString()}`;
+				return sortedPastes.map(paste => {
+					const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
+					const isListed = paste.listed === 1 || paste.listed === '1';
+					const visibilityIcon = isListed ? '🌐' : '🔒';
+					const tooltip = `${visibilityIcon} ${isListed ? 'Public' : 'Private'} • Modified: ${modifiedDate.toLocaleString()}`;
 
-				return new PasteTreeItem(
-					paste.title,
-					paste.modified_on,
-					tooltip,
-					vscode.TreeItemCollapsibleState.None,
-					true
-				);
-			});
+					return new PasteTreeItem(
+						paste.title,
+						paste.modified_on,
+						tooltip,
+						vscode.TreeItemCollapsibleState.None,
+						true,
+						paste
+					);
+				});
+			}
 
 		} catch (error) {
 			// Let the error handler deal with it, but also try to show cached data
@@ -102,6 +130,43 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 		}
 	}
 
+	private createGroupedTreeItems(pastes: PasteItem[], sortBy: 'modified' | 'name' | 'created'): PasteTreeItem[] {
+		const listedPastes = pastes.filter(paste => paste.listed === 1 || paste.listed === '1');
+		const unlistedPastes = pastes.filter(paste => paste.listed === 0 || paste.listed === '0' || !paste.listed);
+
+		const groups: PasteTreeItem[] = [];
+
+		// Public pastes group
+		if (listedPastes.length > 0) {
+			groups.push(new PasteTreeItem(
+				`🌐 Public Pastes (${listedPastes.length})`,
+				'',
+				`${listedPastes.length} public paste${listedPastes.length !== 1 ? 's' : ''}`,
+				vscode.TreeItemCollapsibleState.Expanded,
+				false,
+				undefined,
+				'group',
+				this.sortPastes(listedPastes, sortBy)
+			));
+		}
+
+		// Private pastes group
+		if (unlistedPastes.length > 0) {
+			groups.push(new PasteTreeItem(
+				`🔒 Private Pastes (${unlistedPastes.length})`,
+				'',
+				`${unlistedPastes.length} private paste${unlistedPastes.length !== 1 ? 's' : ''}`,
+				vscode.TreeItemCollapsibleState.Expanded,
+				false,
+				undefined,
+				'group',
+				this.sortPastes(unlistedPastes, sortBy)
+			));
+		}
+
+		return groups;
+	}
+
 	private sortPastes(pastes: PasteItem[], sortBy: 'modified' | 'name' | 'created'): PasteItem[] {
 		switch (sortBy) {
 			case 'name':
@@ -122,15 +187,24 @@ export class PasteTreeItem extends vscode.TreeItem {
 		public readonly modifiedOn: string,
 		public readonly tooltip: string,
 		public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-		public readonly isPaste: boolean = true
+		public readonly isPaste: boolean = true,
+		public readonly pasteData?: PasteItem,
+		public readonly itemType?: 'paste' | 'group' | 'status',
+		public readonly children?: PasteItem[]
 	) {
 		super(title, collapsibleState);
 
 		this.tooltip = tooltip;
 		this.description = modifiedOn ? new Date(parseInt(modifiedOn) * 1000).toLocaleDateString() : '';
-		this.iconPath = new vscode.ThemeIcon('file-text');
 
-		if (isPaste) {
+		// Set icons based on item type
+		if (itemType === 'group') {
+			this.iconPath = new vscode.ThemeIcon('folder');
+			this.contextValue = 'group';
+		} else if (isPaste) {
+			// Set icon based on visibility
+			const isListed = pasteData?.listed === 1 || pasteData?.listed === '1';
+			this.iconPath = new vscode.ThemeIcon(isListed ? 'globe' : 'lock');
 			this.contextValue = 'paste';
             this.command = {
                 command: 'pastepad.openPaste',
@@ -138,6 +212,7 @@ export class PasteTreeItem extends vscode.TreeItem {
                 arguments: [this]
             };
 		} else {
+			this.iconPath = new vscode.ThemeIcon('info');
 			this.contextValue = 'status';
 		}
 	}

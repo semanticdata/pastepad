@@ -4,6 +4,7 @@ import { PastebinProvider } from '../pastebinProvider';
 import { registerAuthenticationCommands } from './authenticationCommands';
 import { registerPasteCommands } from './pasteCommands';
 import { registerViewCommands } from './viewCommands';
+import { registerSettingsCommands } from './settingsCommands';
 
 export interface CommandDependencies {
     authManager: AuthenticationManager;
@@ -28,6 +29,10 @@ export function registerAllCommands(
     // Register view commands
     const viewCommands = registerViewCommands(context, pastebinProvider);
     allCommands.push(...viewCommands);
+
+    // Register settings commands
+    const settingsCommands = registerSettingsCommands(context, pastebinProvider);
+    allCommands.push(...settingsCommands);
 
     return allCommands;
 }

@@ -15,7 +15,8 @@ export function registerPasteCommands(
     // Open paste command
     const openPasteCommand = vscode.commands.registerCommand('pastepad.openPaste', async (item: any) => {
         try {
-            const title = item?.title;
+            // Handle both old format (direct title) and new format (tree item with pasteData)
+            const title = item?.pasteData?.title || item?.title;
             if (!title) {
                 await errorHandler.handleError(
                     errorHandler.createError(
@@ -38,7 +39,7 @@ export function registerPasteCommands(
         } catch (error) {
             await errorHandler.handleError(error as Error, {
                 operation: 'openPaste',
-                title: item?.title
+                title: item?.pasteData?.title || item?.title
             });
         }
     });
@@ -100,7 +101,7 @@ export function registerPasteCommands(
     // Delete paste command
     const deletePasteCommand = vscode.commands.registerCommand('pastepad.deletePaste', async (item: any) => {
         try {
-            const title = item?.title;
+            const title = item?.pasteData?.title || item?.title;
             if (!title) {
                 await errorHandler.handleError(
                     errorHandler.createError(
@@ -133,7 +134,7 @@ export function registerPasteCommands(
         } catch (error) {
             await errorHandler.handleError(error as Error, {
                 operation: 'deletePaste',
-                title: item?.title
+                title: item?.pasteData?.title || item?.title
             });
         }
     });

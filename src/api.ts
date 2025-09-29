@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
 import { PasteItem } from './types';
-import { ErrorHandler, RetryManager, CacheManager, ErrorType, ErrorSeverity } from './services';
+import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity } from './services';
 
 const API_URL = 'https://api.omg.lol';
 
@@ -19,11 +19,13 @@ export class OmgLolApi {
     private errorHandler: ErrorHandler;
     private retryManager: RetryManager;
     private cacheManager: CacheManager;
+    private stateManager: StateManager;
 
     constructor(private authManager: AuthenticationManager) {
         this.errorHandler = ErrorHandler.getInstance();
         this.retryManager = RetryManager.getInstance();
         this.cacheManager = CacheManager.getInstance();
+        this.stateManager = StateManager.getInstance();
     }
 
     private async getHeaders(): Promise<{ [key: string]: string }> {
@@ -57,34 +59,56 @@ export class OmgLolApi {
                 );
             }
 
-            const result = await this.retryManager.retryApiCall(async () => {
-                const response = await fetch(`${API_URL}/address/${address}/pastebin`, {
-                    headers: await this.getHeaders()
-                });
+            // Get all pastes (authenticated) and listed pastes (unauthenticated) in parallel
+            const [allPastesResult, listedPastesResult] = await Promise.all([
+                this.retryManager.retryApiCall(async () => {
+                    const response = await fetch(`${API_URL}/address/${address}/pastebin`, {
+                        headers: await this.getHeaders()
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
 
-                return response.json() as Promise<GetPastesResponse>;
-            });
+                    return response.json() as Promise<GetPastesResponse>;
+                }),
+                this.retryManager.retryApiCall(async () => {
+                    const response = await fetch(`${API_URL}/address/${address}/pastebin`);
 
-            if (!result.success) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    return response.json() as Promise<GetPastesResponse>;
+                })
+            ]);
+
+            if (!allPastesResult.success) {
                 // Try to return cached data as fallback
                 const fallback = await this.cacheManager.getOfflinePasteList();
                 if (fallback) {
                     vscode.window.showWarningMessage('Using cached data due to connection issues');
                     return fallback;
                 }
-                throw result.error || new Error('Failed to fetch pastes');
+                throw allPastesResult.error || new Error('Failed to fetch pastes');
             }
 
-            const pastes = result.result!.response.pastebin || [];
+            const allPastes = allPastesResult.result!.response.pastebin || [];
+            const listedPastes = listedPastesResult.success ? (listedPastesResult.result!.response.pastebin || []) : [];
+
+            // Create a Set of listed paste titles for quick lookup
+            const listedTitles = new Set(listedPastes.map(paste => paste.title));
+
+            // Add the listed property to each paste
+            const pastesWithListedInfo: PasteItem[] = allPastes.map(paste => ({
+                ...paste,
+                listed: listedTitles.has(paste.title) ? 1 : 0
+            }));
 
             // Cache the results
-            await this.cacheManager.setPasteList(pastes);
+            await this.cacheManager.setPasteList(pastesWithListedInfo);
 
-            return pastes;
+            return pastesWithListedInfo;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -142,7 +166,24 @@ export class OmgLolApi {
 
             const paste = result.result!.response.paste;
             if (paste) {
-                // Cache the result
+                // Check if this paste is listed by fetching the public pastebin
+                try {
+                    const listedResponse = await fetch(`${API_URL}/address/${address}/pastebin`);
+                    if (listedResponse.ok) {
+                        const listedData = await listedResponse.json() as GetPastesResponse;
+                        const listedPastes = listedData.response.pastebin || [];
+                        const isListed = listedPastes.some(listedPaste => listedPaste.title === title);
+                        paste.listed = isListed ? 1 : 0;
+                    } else {
+                        // Default to unlisted if we can't determine
+                        paste.listed = 0;
+                    }
+                } catch {
+                    // Default to unlisted if there's an error
+                    paste.listed = 0;
+                }
+
+                // Cache the result with listed info
                 await this.cacheManager.setPasteContent(title, paste);
             }
 
@@ -161,7 +202,7 @@ export class OmgLolApi {
         }
     }
 
-    async createPaste(title: string, content: string): Promise<void> {
+    async createPaste(title: string, content: string, listed?: boolean): Promise<void> {
         try {
             const address = await this.authManager.getAddress();
             if (!address) {
@@ -173,11 +214,18 @@ export class OmgLolApi {
                 );
             }
 
+            // Get user preference for listing new pastes if not explicitly specified
+            let shouldList = listed;
+            if (shouldList === undefined) {
+                const preferences = await this.stateManager.getUserPreferences();
+                shouldList = preferences.defaultListNewPastes ?? true; // Default to public
+            }
+
             const result = await this.retryManager.retryApiCall(async () => {
-                const response = await fetch(`${API_URL}/address/${address}/pastebin`, {
+                const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
                     method: 'POST',
                     headers: await this.getHeaders(),
-                    body: JSON.stringify({ title, content, listed: 1 })
+                    body: JSON.stringify({ title, content, listed: shouldList ? 1 : 0 })
                 });
 
                 if (!response.ok) {
@@ -217,10 +265,12 @@ export class OmgLolApi {
             }
 
             const result = await this.retryManager.retryApiCall(async () => {
-                const response = await fetch(`${API_URL}/address/${address}/pastebin/${title}`, {
-                    method: 'PUT',
+                // Use POST method as per API documentation for "Create or update a paste"
+                // For updates, only send title and content - API preserves existing visibility
+                const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
+                    method: 'POST',
                     headers: await this.getHeaders(),
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ title, content })
                 });
 
                 if (!response.ok) {

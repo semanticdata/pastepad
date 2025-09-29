@@ -6,6 +6,8 @@ export interface UserPreferences {
     viewMode?: 'list' | 'grid';
     autoSave?: boolean;
     syncOnSave?: boolean;
+    defaultListNewPastes?: boolean;
+    groupPastesByVisibility?: boolean;
 }
 
 export interface UIState {
@@ -43,7 +45,9 @@ export class StateManager {
             sortBy: 'modified',
             viewMode: 'list',
             autoSave: true,
-            syncOnSave: false
+            syncOnSave: false,
+            defaultListNewPastes: true,
+            groupPastesByVisibility: false
         });
     }
 
