@@ -1,16 +1,18 @@
-# pastepad README
+# PastePad
 
-This is the README for your extension "pastepad". After writing up a brief description, we recommend including the following sections.
+**Manage your omg.lol pastebin directly from VS Code.**
+
+`PastePad` is a VS Code extension that allows you to seamlessly interact with your `omg.lol` pastebin without leaving your editor. View, create, edit, and delete your pastes with ease.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+* **Authentication:** Securely authenticate with your `omg.lol` account.
+* **Paste Listing:** View all your pastes in a convenient tree view in the activity bar.
+* **Create & Edit:** Create new pastes and edit existing ones directly in VS Code.
+* **Save & Delete:** Save your changes back to your pastebin or delete pastes you no longer need.
+* **Auto-Sync:** Changes to your pastes are automatically synced.
+* **Language Detection:** Automatic language detection for syntax highlighting based on the paste title's file extension.
+* **Refresh & Logout:** Easily refresh your paste list and log out of your account.
 
 ## Requirements
 

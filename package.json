@@ -1,10 +1,10 @@
 {
   "name": "pastepad",
-  "displayName": "pastepad",
+  "displayName": "PastePad",
   "description": "Access and manage your omg.lol pastebin from VS Code.",
   "version": "0.0.1",
   "publisher": "semanticdata",
-  "repository": "https://github.com/microsoft/vscode-extension-samples/helloworld-sample",
+  "repository": "https://github.com/semanticdata/pastepad",
   "engines": {
     "vscode": "^1.104.0"
   },
@@ -72,7 +72,7 @@
       "activitybar": [
         {
           "id": "pastepad",
-          "title": "Pastepad",
+          "title": "PastePad",
           "icon": "$(file-text)"
         }
       ]
@@ -153,16 +153,16 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/vscode": "^1.104.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
-    "eslint": "^9.34.0",
-    "esbuild": "^0.25.9",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.9.2",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.34.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.2"
   }
 }
