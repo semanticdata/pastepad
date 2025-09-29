@@ -4,6 +4,7 @@ import { OmgLolApi } from './api';
 import { PastebinProvider } from './pastebinProvider';
 import { PastepadFileSystemProvider } from './PastepadFileSystemProvider';
 import { registerAllCommands, CommandDependencies } from './commands';
+import { initializeServices } from './services';
 
 class PastepadUriHandler implements vscode.UriHandler {
     constructor(private authManager: AuthenticationManager) {}
@@ -23,6 +24,9 @@ class PastepadUriHandler implements vscode.UriHandler {
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Pastepad extension activated!');
+
+	// Initialize services first
+	initializeServices(context);
 
 	const authManager = new AuthenticationManager(context);
     const api = new OmgLolApi(authManager);

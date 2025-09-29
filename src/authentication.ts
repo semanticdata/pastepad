@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { URLSearchParams } from 'url';
+import { StateManager, ErrorHandler, RetryManager, ErrorType, ErrorSeverity } from './services';
 
 // IMPORTANT: Replace with your actual client ID and secret
 const OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID';
@@ -27,8 +28,15 @@ interface TokenResponse {
 
 export class AuthenticationManager {
     private onAuthenticationChangedEmitter = new vscode.EventEmitter<void>();
+    private stateManager: StateManager;
+    private errorHandler: ErrorHandler;
+    private retryManager: RetryManager;
 
-    constructor(private context: vscode.ExtensionContext) {}
+    constructor(private context: vscode.ExtensionContext) {
+        this.stateManager = StateManager.getInstance();
+        this.errorHandler = ErrorHandler.getInstance();
+        this.retryManager = RetryManager.getInstance();
+    }
 
     get onAuthenticationChanged(): vscode.Event<void> {
         return this.onAuthenticationChangedEmitter.event;
@@ -52,99 +60,166 @@ export class AuthenticationManager {
     }
 
     private async authenticateWithOAuth(): Promise<void> {
-        const state = Date.now().toString();
-        this.context.globalState.update('oauthState', state);
+        try {
+            const state = Date.now().toString();
+            await this.stateManager.setOAuthState(state);
 
-        const searchParams = new URLSearchParams({
-            client_id: OAUTH_CLIENT_ID,
-            redirect_uri: REDIRECT_URI,
-            response_type: 'code',
-            state: state,
-        });
+            const searchParams = new URLSearchParams({
+                client_id: OAUTH_CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                response_type: 'code',
+                state: state,
+            });
 
-        const uri = vscode.Uri.parse(`${OAUTH_AUTHORIZATION_URL}?${searchParams.toString()}`);
-        vscode.env.openExternal(uri);
+            const uri = vscode.Uri.parse(`${OAUTH_AUTHORIZATION_URL}?${searchParams.toString()}`);
+            await vscode.env.openExternal(uri);
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'authenticateWithOAuth'
+            });
+        }
     }
 
     private async authenticateWithApiKey(): Promise<void> {
-        const address = await vscode.window.showInputBox({ 
-            prompt: 'Enter your omg.lol address',
-            validateInput: (value) => {
-                if (!value || value.trim().length === 0) {
-                    return 'Address is required';
-                }
-                if (value.includes('@') || value.includes('.')) {
-                    return "Enter only the address part (e.g., 'yourname')";
-                }
-                return null;
-            }
-        });
-        if (!address) {
-            return;
-        }
-
-        const apiKey = await vscode.window.showInputBox({ prompt: 'Enter your omg.lol API Key', password: true });
-        if (!apiKey) {
-            return;
-        }
-
-        // A simple test to see if the credentials are valid
         try {
-            const response = await fetch(`https://api.omg.lol/address/${address}/info`, {
-                headers: { 'Authorization': `Bearer ${apiKey}` }
+            const address = await vscode.window.showInputBox({
+                prompt: 'Enter your omg.lol address',
+                validateInput: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Address is required';
+                    }
+                    if (value.includes('@') || value.includes('.')) {
+                        return "Enter only the address part (e.g., 'yourname')";
+                    }
+                    return null;
+                }
             });
-            if (!response.ok) {
-                vscode.window.showErrorMessage('Invalid address or API Key.');
+            if (!address) {
                 return;
             }
-        } catch (e) {
-            vscode.window.showErrorMessage('Failed to validate API Key.');
-            return;
-        }
 
-        await this.context.secrets.store(AUTH_METHOD_KEY, 'apikey');
-        await this.context.secrets.store(ADDRESS_KEY, address);
-        await this.context.secrets.store(API_KEY, apiKey);
-        this.onAuthenticationChangedEmitter.fire();
-        vscode.window.showInformationMessage('Successfully authenticated with API Key!');
+            const apiKey = await vscode.window.showInputBox({
+                prompt: 'Enter your omg.lol API Key',
+                password: true
+            });
+            if (!apiKey) {
+                return;
+            }
+
+            // Validate credentials with retry logic
+            const validationResult = await this.retryManager.retryNetworkRequest(async () => {
+                const response = await fetch(`https://api.omg.lol/address/${address}/info`, {
+                    headers: { 'Authorization': `Bearer ${apiKey}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json();
+            }, {
+                maxAttempts: 2,
+                baseDelay: 1000
+            });
+
+            if (!validationResult.success) {
+                await this.errorHandler.handleError(
+                    this.errorHandler.createError(
+                        ErrorType.AUTHENTICATION,
+                        ErrorSeverity.MEDIUM,
+                        'API key validation failed',
+                        'Invalid address or API Key. Please check your credentials.',
+                        {
+                            suggestedActions: ['Verify your address', 'Check your API key', 'Try again'],
+                            context: { address, operation: 'validateApiKey' }
+                        }
+                    )
+                );
+                return;
+            }
+
+            await this.context.secrets.store(AUTH_METHOD_KEY, 'apikey');
+            await this.context.secrets.store(ADDRESS_KEY, address);
+            await this.context.secrets.store(API_KEY, apiKey);
+
+            this.onAuthenticationChangedEmitter.fire();
+            vscode.window.showInformationMessage('Successfully authenticated with API Key!');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'authenticateWithApiKey'
+            });
+        }
     }
 
     async handleAuthorizationCode(code: string, state: string): Promise<void> {
-        const savedState = this.context.globalState.get<string>('oauthState');
-        if (state !== savedState) {
-            vscode.window.showErrorMessage('Invalid OAuth state. Please try again.');
-            return;
-        }
-
         try {
-            const response = await fetch(OAUTH_TOKEN_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    grant_type: 'authorization_code',
-                    client_id: OAUTH_CLIENT_ID,
-                    client_secret: OAUTH_CLIENT_SECRET,
-                    code: code,
-                    redirect_uri: REDIRECT_URI,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to get access token: ${await response.text()}`);
+            const savedState = await this.stateManager.getOAuthState();
+            if (state !== savedState) {
+                await this.errorHandler.handleError(
+                    this.errorHandler.createError(
+                        ErrorType.AUTHENTICATION,
+                        ErrorSeverity.HIGH,
+                        'OAuth state mismatch',
+                        'Invalid OAuth state. Please try authenticating again.',
+                        {
+                            suggestedActions: ['Try authenticating again'],
+                            recoveryAction: async () => {
+                                await this.stateManager.clearOAuthState();
+                            }
+                        }
+                    )
+                );
+                return;
             }
 
-            const data = await response.json() as TokenResponse;
-            const { access_token, refresh_token, address } = data.response;
+            // Exchange authorization code for tokens with retry logic
+            const tokenResult = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(OAUTH_TOKEN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        grant_type: 'authorization_code',
+                        client_id: OAUTH_CLIENT_ID,
+                        client_secret: OAUTH_CLIENT_SECRET,
+                        code: code,
+                        redirect_uri: REDIRECT_URI,
+                    }),
+                });
 
-            await this.context.secrets.store(AUTH_METHOD_KEY, 'oauth');
-            await this.context.secrets.store(ACCESS_TOKEN_KEY, access_token);
-            await this.context.secrets.store(REFRESH_TOKEN_KEY, refresh_token);
-            await this.context.secrets.store(ADDRESS_KEY, address);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                return response.json() as Promise<TokenResponse>;
+            });
+
+            if (!tokenResult.success) {
+                await this.errorHandler.handleError(
+                    tokenResult.error || new Error('Failed to exchange authorization code'),
+                    { operation: 'exchangeAuthorizationCode', code }
+                );
+                return;
+            }
+
+            const { access_token, refresh_token, address } = tokenResult.result!.response;
+
+            await Promise.all([
+                this.context.secrets.store(AUTH_METHOD_KEY, 'oauth'),
+                this.context.secrets.store(ACCESS_TOKEN_KEY, access_token),
+                this.context.secrets.store(REFRESH_TOKEN_KEY, refresh_token),
+                this.context.secrets.store(ADDRESS_KEY, address),
+                this.stateManager.clearOAuthState()
+            ]);
 
             this.onAuthenticationChangedEmitter.fire();
             vscode.window.showInformationMessage('Successfully authenticated with omg.lol!');
+
         } catch (error) {
-            vscode.window.showErrorMessage(`Authentication failed: ${error}`);
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'handleAuthorizationCode'
+            });
         }
     }
 
