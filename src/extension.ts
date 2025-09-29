@@ -76,9 +76,9 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	authManager.onAuthenticationChanged(() => {
+	authManager.onAuthenticationChanged(async () => {
 		updateContext();
-		pastebinProvider.refresh();
+		await pastebinProvider.forceRefresh();
 	});
 
 	// Initialize contexts

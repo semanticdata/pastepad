@@ -166,7 +166,7 @@ export class OmgLolApi {
 
             const paste = result.result!.response.paste;
             if (paste) {
-                // Check if this paste is listed by fetching the public pastebin
+                // Check if this paste is listed by fetching the listed pastebin
                 try {
                     const listedResponse = await fetch(`${API_URL}/address/${address}/pastebin`);
                     if (listedResponse.ok) {
@@ -218,21 +218,33 @@ export class OmgLolApi {
             let shouldList = listed;
             if (shouldList === undefined) {
                 const preferences = await this.stateManager.getUserPreferences();
-                shouldList = preferences.defaultListNewPastes ?? true; // Default to public
+                shouldList = preferences.defaultListNewPastes ?? false; // Default to unlisted for safety
             }
 
+            console.log(`Creating new paste "${title}" with listed=${shouldList ? 1 : 0}`);
+            vscode.window.showInformationMessage(`Creating "${title}" as ${shouldList ? 'listed' : 'unlisted'}`);
+
             const result = await this.retryManager.retryApiCall(async () => {
+                const requestBody = { title, content, listed: shouldList ? 1 : 0 };
+                console.log(`CREATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
+
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
                     method: 'POST',
                     headers: await this.getHeaders(),
-                    body: JSON.stringify({ title, content, listed: shouldList ? 1 : 0 })
+                    body: JSON.stringify(requestBody)
                 });
 
+                console.log(`CREATE RESPONSE: ${response.status} ${response.statusText}`);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const errorText = await response.text();
+                    console.error(`CREATE ERROR RESPONSE:`, errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
                 }
 
-                return response.json();
+                const responseData = await response.json();
+                console.log(`CREATE RESPONSE DATA:`, JSON.stringify(responseData, null, 2));
+                return responseData;
             });
 
             if (!result.success) {
@@ -264,20 +276,73 @@ export class OmgLolApi {
                 );
             }
 
+            // CRITICAL: We must preserve the current visibility status
+            // The API seems to default to listed=1 if not specified, so we need to explicitly preserve it
+            let listed = 0; // Default to unlisted for safety
+
+            try {
+                // Make a synchronous call to get just the listed pastes to determine current visibility
+                const listedResponse = await fetch(`${API_URL}/address/${address}/pastebin`);
+                if (listedResponse.ok) {
+                    const listedData = await listedResponse.json() as GetPastesResponse;
+                    const listedPastes = listedData.response.pastebin || [];
+                    const isCurrentlyListed = listedPastes.some(paste => paste.title === title);
+                    listed = isCurrentlyListed ? 1 : 0;
+
+                    console.log(`LISTED PASTES:`, listedPastes.map(p => p.title));
+                    console.log(`Looking for paste: "${title}"`);
+                    console.log(`Found in listed list: ${isCurrentlyListed}`);
+                    console.log(`Setting listed to: ${listed}`);
+                    console.log(`Paste "${title}" is currently ${isCurrentlyListed ? 'listed' : 'unlisted'}, preserving this status`);
+                    vscode.window.showInformationMessage(`Preserving paste "${title}" as ${isCurrentlyListed ? 'listed' : 'unlisted'}`);
+                } else {
+                    console.warn(`Could not determine current visibility for paste "${title}", defaulting to unlisted for safety`);
+                vscode.window.showWarningMessage(`Could not determine visibility for "${title}", defaulting to unlisted`);
+                }
+            } catch (visibilityError) {
+                console.warn(`Error determining current visibility for paste "${title}", defaulting to unlisted for safety:`, visibilityError);
+                vscode.window.showWarningMessage(`Error checking visibility for "${title}": ${visibilityError}`);
+            }
+
+            // WORKAROUND: omg.lol API has a bug where "create or update" endpoint ignores
+            // the `listed` parameter for existing pastes. We need to delete and recreate
+            // to preserve the correct visibility.
+            console.log(`WORKAROUND: Delete and recreate paste "${title}" to preserve visibility`);
+            vscode.window.showInformationMessage(`API Bug Workaround: Recreating "${title}" to preserve visibility`);
+
             const result = await this.retryManager.retryApiCall(async () => {
-                // Use POST method as per API documentation for "Create or update a paste"
-                // For updates, only send title and content - API preserves existing visibility
-                const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
-                    method: 'POST',
-                    headers: await this.getHeaders(),
-                    body: JSON.stringify({ title, content })
+                // Step 1: Delete the existing paste
+                console.log(`Step 1: Deleting existing paste "${title}"`);
+                const deleteResponse = await fetch(`${API_URL}/address/${address}/pastebin/${title}`, {
+                    method: 'DELETE',
+                    headers: await this.getHeaders()
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                if (!deleteResponse.ok) {
+                    throw new Error(`Failed to delete paste: ${deleteResponse.status} ${deleteResponse.statusText}`);
                 }
 
-                return response.json();
+                console.log(`Step 1 complete: Paste "${title}" deleted`);
+
+                // Step 2: Recreate with correct visibility
+                console.log(`Step 2: Recreating paste "${title}" with listed=${listed}`);
+                const createResponse = await fetch(`${API_URL}/address/${address}/pastebin/`, {
+                    method: 'POST',
+                    headers: await this.getHeaders(),
+                    body: JSON.stringify({ title, content, listed })
+                });
+
+                console.log(`API RESPONSE: ${createResponse.status} ${createResponse.statusText}`);
+
+                if (!createResponse.ok) {
+                    throw new Error(`Failed to recreate paste: ${createResponse.status} ${createResponse.statusText}`);
+                }
+
+                const responseData = await createResponse.json();
+                console.log(`Step 2 complete: Paste "${title}" recreated with correct visibility`);
+                console.log(`API RESPONSE DATA:`, JSON.stringify(responseData, null, 2));
+
+                return responseData;
             });
 
             if (!result.success) {

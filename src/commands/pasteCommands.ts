@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AuthenticationManager } from '../authentication';
 import { PastebinProvider } from '../pastebinProvider';
 import { ErrorHandler, StateManager, ErrorType, ErrorSeverity } from '../services';
+import { OmgLolApi } from '../api';
 
 export function registerPasteCommands(
     context: vscode.ExtensionContext,
@@ -11,6 +12,9 @@ export function registerPasteCommands(
     const commands: vscode.Disposable[] = [];
     const errorHandler = ErrorHandler.getInstance();
     const stateManager = StateManager.getInstance();
+
+    // Get API instance
+    const api = new OmgLolApi(authManager);
 
     // Open paste command
     const openPasteCommand = vscode.commands.registerCommand('pastepad.openPaste', async (item: any) => {
@@ -44,7 +48,7 @@ export function registerPasteCommands(
         }
     });
 
-    // New paste command
+    // New paste command with multi-step input flow
     const newPasteCommand = vscode.commands.registerCommand('pastepad.newPaste', async () => {
         try {
             if (!await authManager.isAuthenticated()) {
@@ -65,31 +69,134 @@ export function registerPasteCommands(
                 return;
             }
 
-            const title = await vscode.window.showInputBox({
-                prompt: 'Enter a title for the new paste',
-                validateInput: (value) => {
-                    if (!value || value.trim().length === 0) {
-                        return 'Title is required';
+            // Multi-step input flow
+            const input = vscode.window.createInputBox();
+            let currentStep = 1;
+            const totalSteps = 3;
+            let title = '';
+            let content = '';
+            let isListed = false;
+
+            return new Promise<void>((resolve, reject) => {
+                input.onDidTriggerButton((item) => {
+                    if (item === vscode.QuickInputButtons.Back) {
+                        if (currentStep > 1) {
+                            currentStep--;
+                            updateInputForStep();
+                        }
                     }
-                    if (value.length > 100) {
-                        return 'Title must be less than 100 characters';
+                });
+
+                input.onDidAccept(async () => {
+                    const value = input.value.trim();
+
+                    if (currentStep === 1) {
+                        // Step 1: Title
+                        if (!value) {
+                            input.validationMessage = 'Title is required';
+                            return;
+                        }
+                        if (value.length > 100) {
+                            input.validationMessage = 'Title must be less than 100 characters';
+                            return;
+                        }
+                        title = value;
+                        currentStep++;
+                        updateInputForStep();
+                    } else if (currentStep === 2) {
+                        // Step 2: Content
+                        if (!value) {
+                            input.validationMessage = 'Content is required';
+                            return;
+                        }
+                        content = value;
+                        currentStep++;
+                        updateInputForStep();
+                    } else if (currentStep === 3) {
+                        // Step 3: Visibility
+                        const answer = value.toLowerCase();
+                        if (answer === 'listed' || answer === 'l') {
+                            isListed = true;
+                        } else if (answer === 'unlisted' || answer === 'u') {
+                            isListed = false;
+                        } else {
+                            input.validationMessage = 'Please enter "listed" or "unlisted"';
+                            return;
+                        }
+
+                        // All steps complete, create the paste
+                        input.hide();
+                        try {
+                            await vscode.window.withProgress({
+                                location: vscode.ProgressLocation.Notification,
+                                title: `Creating paste "${title}"...`,
+                                cancellable: false
+                            }, async () => {
+                                await api.createPaste(title, content, isListed);
+                            });
+
+                            vscode.window.showInformationMessage(`Successfully created ${isListed ? 'listed' : 'unlisted'} paste "${title}"`);
+
+                            // Open the newly created paste
+                            const uri = vscode.Uri.parse(`pastepad:/${title}`);
+                            const doc = await vscode.workspace.openTextDocument(uri);
+                            await vscode.window.showTextDocument(doc, { preview: false });
+
+                            // Add to recently opened and refresh tree
+                            await stateManager.addRecentlyOpenedPaste(title);
+                            pastebinProvider.refresh();
+
+                            resolve();
+                        } catch (error) {
+                            await errorHandler.handleError(error as Error, {
+                                operation: 'newPaste',
+                                title,
+                                contentLength: content.length
+                            });
+                            reject(error);
+                        }
                     }
-                    return null;
+                });
+
+                input.onDidHide(() => {
+                    resolve(); // User cancelled
+                });
+
+                function updateInputForStep() {
+                    input.validationMessage = '';
+                    input.buttons = currentStep > 1 ? [vscode.QuickInputButtons.Back] : [];
+
+                    switch (currentStep) {
+                        case 1:
+                            input.title = 'New Paste';
+                            input.step = 1;
+                            input.totalSteps = totalSteps;
+                            input.placeholder = 'Enter paste title (e.g., "my-code-snippet")';
+                            input.prompt = 'What should this paste be called?';
+                            input.value = title;
+                            break;
+                        case 2:
+                            input.title = 'New Paste';
+                            input.step = 2;
+                            input.totalSteps = totalSteps;
+                            input.placeholder = 'Enter paste content';
+                            input.prompt = 'What content should this paste contain?';
+                            input.value = content;
+                            break;
+                        case 3:
+                            input.title = 'New Paste';
+                            input.step = 3;
+                            input.totalSteps = totalSteps;
+                            input.placeholder = 'listed or unlisted';
+                            input.prompt = 'Should this paste be listed or unlisted? (default: unlisted)';
+                            input.value = '';
+                            break;
+                    }
                 }
+
+                updateInputForStep();
+                input.show();
             });
-
-            if (!title || title.trim().length === 0) {
-                return; // User cancelled or provided empty title
-            }
-
-            const trimmedTitle = title.trim();
-            const uri = vscode.Uri.parse(`pastepad:/${trimmedTitle}`);
-            await vscode.workspace.fs.writeFile(uri, new Uint8Array());
-            const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc, { preview: false });
-
-            // Add to recently opened
-            await stateManager.addRecentlyOpenedPaste(trimmedTitle);
 
         } catch (error) {
             await errorHandler.handleError(error as Error, {
@@ -127,7 +234,7 @@ export function registerPasteCommands(
 
             const uri = vscode.Uri.parse(`pastepad:/${title}`);
             await vscode.workspace.fs.delete(uri);
-            pastebinProvider.refresh();
+            await pastebinProvider.forceRefresh();
 
             vscode.window.showInformationMessage(`Successfully deleted "${title}"`);
 
@@ -179,7 +286,7 @@ export function registerPasteCommands(
             const title = activeEditor.document.uri.path.substring(1);
             await activeEditor.document.save();
             vscode.window.showInformationMessage(`Successfully saved "${title}"`);
-            pastebinProvider.refresh();
+            await pastebinProvider.forceRefresh();
 
         } catch (error) {
             await errorHandler.handleError(error as Error, {
@@ -239,7 +346,7 @@ export function registerPasteCommands(
             });
 
             vscode.window.showInformationMessage(`Successfully synced "${title}"`);
-            pastebinProvider.refresh();
+            await pastebinProvider.forceRefresh();
 
             // Clear the unsaved changes context
             vscode.commands.executeCommand('setContext', 'pastepad.hasUnsyncedChanges', false);

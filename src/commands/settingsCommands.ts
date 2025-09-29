@@ -46,8 +46,8 @@ export function registerSettingsCommands(
             });
 
             const message = newListingState
-                ? 'New pastes will be public by default'
-                : 'New pastes will be private by default';
+                ? 'New pastes will be listed by default'
+                : 'New pastes will be unlisted by default';
 
             vscode.window.showInformationMessage(message);
 
@@ -68,7 +68,7 @@ export function registerSettingsCommands(
             const statsMessage = `
 **Pastepad Settings:**
 • Grouping by visibility: ${preferences.groupPastesByVisibility ? 'Enabled' : 'Disabled'}
-• Default visibility for new pastes: ${preferences.defaultListNewPastes ? 'Public' : 'Private'}
+• Default visibility for new pastes: ${preferences.defaultListNewPastes ? 'Listed' : 'Unlisted'}
 • Sort by: ${preferences.sortBy || 'modified'}
 • Auto-save: ${preferences.autoSave ? 'Enabled' : 'Disabled'}
             `.trim();

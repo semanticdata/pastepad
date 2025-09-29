@@ -7,9 +7,9 @@ export function registerViewCommands(
 ): vscode.Disposable[] {
     const commands: vscode.Disposable[] = [];
 
-    // Refresh command
-    const refreshCommand = vscode.commands.registerCommand('pastepad.refresh', () => {
-        pastebinProvider.refresh();
+    // Refresh command - force fresh API call to get updated visibility status
+    const refreshCommand = vscode.commands.registerCommand('pastepad.refresh', async () => {
+        await pastebinProvider.forceRefresh();
     });
 
     commands.push(refreshCommand);

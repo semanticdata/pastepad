@@ -21,6 +21,21 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 		this._onDidChangeTreeData.fire();
 	}
 
+	async forceRefresh(): Promise<void> {
+		try {
+			// Force fresh API call to get updated paste data including visibility changes
+			await this.api.getPastes(true);
+			// Now refresh the tree view with fresh data
+			this._onDidChangeTreeData.fire();
+		} catch (error) {
+			// If refresh fails, still fire the tree update to show cached data
+			await this.errorHandler.handleError(error as Error, {
+				operation: 'forceRefresh'
+			});
+			this._onDidChangeTreeData.fire();
+		}
+	}
+
 	getTreeItem(element: PasteTreeItem): vscode.TreeItem {
 		return element;
 	}
@@ -36,7 +51,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 				const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
 				const isListed = paste.listed === 1 || paste.listed === '1';
 				const visibilityIcon = isListed ? '🌐' : '🔒';
-				const tooltip = `${visibilityIcon} ${isListed ? 'Public' : 'Private'} • Modified: ${modifiedDate.toLocaleString()}`;
+				const tooltip = `${visibilityIcon} ${isListed ? 'Listed' : 'Unlisted'} • Modified: ${modifiedDate.toLocaleString()}`;
 
 				return new PasteTreeItem(
 					paste.title,
@@ -82,7 +97,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 					const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
 					const isListed = paste.listed === 1 || paste.listed === '1';
 					const visibilityIcon = isListed ? '🌐' : '🔒';
-					const tooltip = `${visibilityIcon} ${isListed ? 'Public' : 'Private'} • Modified: ${modifiedDate.toLocaleString()}`;
+					const tooltip = `${visibilityIcon} ${isListed ? 'Listed' : 'Unlisted'} • Modified: ${modifiedDate.toLocaleString()}`;
 
 					return new PasteTreeItem(
 						paste.title,
@@ -136,12 +151,12 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 
 		const groups: PasteTreeItem[] = [];
 
-		// Public pastes group
+		// Listed pastes group
 		if (listedPastes.length > 0) {
 			groups.push(new PasteTreeItem(
-				`🌐 Public Pastes (${listedPastes.length})`,
+				`🌐 Listed Pastes (${listedPastes.length})`,
 				'',
-				`${listedPastes.length} public paste${listedPastes.length !== 1 ? 's' : ''}`,
+				`${listedPastes.length} listed paste${listedPastes.length !== 1 ? 's' : ''}`,
 				vscode.TreeItemCollapsibleState.Expanded,
 				false,
 				undefined,
@@ -150,12 +165,12 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 			));
 		}
 
-		// Private pastes group
+		// Unlisted pastes group
 		if (unlistedPastes.length > 0) {
 			groups.push(new PasteTreeItem(
-				`🔒 Private Pastes (${unlistedPastes.length})`,
+				`🔒 Unlisted Pastes (${unlistedPastes.length})`,
 				'',
-				`${unlistedPastes.length} private paste${unlistedPastes.length !== 1 ? 's' : ''}`,
+				`${unlistedPastes.length} unlisted paste${unlistedPastes.length !== 1 ? 's' : ''}`,
 				vscode.TreeItemCollapsibleState.Expanded,
 				false,
 				undefined,

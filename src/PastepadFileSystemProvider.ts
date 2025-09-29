@@ -38,15 +38,37 @@ export class PastepadFileSystemProvider implements vscode.FileSystemProvider {
         const title = uri.path.substring(1);
         const newContent = content.toString();
 
+        console.log(`FileSystemProvider.writeFile called for "${title}", create: ${options.create}, overwrite: ${options.overwrite}`);
+        console.log(`Content length: ${content.length}, content: "${newContent}"`);
+
         try {
-            if (options.create) {
-                await this.api.createPaste(title, newContent);
-                this._emitter.fire([{ type: vscode.FileChangeType.Created, uri }]);
-            } else {
+            // CRITICAL FIX: Always check if paste already exists, regardless of options.create
+            // VS Code sometimes calls with create: true even for existing files
+            let pasteExists = false;
+            try {
+                console.log(`Checking if paste "${title}" exists...`);
+                const existingPaste = await this.api.getPaste(title);
+                pasteExists = !!existingPaste;
+                console.log(`Paste "${title}" exists: ${pasteExists}`);
+            } catch (error) {
+                // If we can't determine, assume it doesn't exist
+                console.log(`Error checking if paste "${title}" exists, assuming it doesn't exist:`, error);
+                pasteExists = false;
+            }
+
+            if (pasteExists) {
+                console.log(`Paste "${title}" exists, calling updatePaste to preserve visibility`);
+                vscode.window.showInformationMessage(`Updating existing paste "${title}" (preserving visibility)`);
                 await this.api.updatePaste(title, newContent);
                 this._emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+            } else {
+                console.log(`Paste "${title}" doesn't exist, calling createPaste`);
+                vscode.window.showInformationMessage(`Creating new paste "${title}"`);
+                await this.api.createPaste(title, newContent);
+                this._emitter.fire([{ type: vscode.FileChangeType.Created, uri }]);
             }
         } catch (error) {
+            console.error(`Error in writeFile for "${title}":`, error);
             throw new vscode.FileSystemError(error as any);
         }
     }

@@ -46,7 +46,7 @@ export class StateManager {
             viewMode: 'list',
             autoSave: true,
             syncOnSave: false,
-            defaultListNewPastes: true,
+            defaultListNewPastes: false,
             groupPastesByVisibility: false
         });
     }
