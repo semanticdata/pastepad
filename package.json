@@ -58,6 +58,23 @@
         "command": "pastepad.forceSync",
         "title": "Force Sync Changes",
         "icon": "$(sync)"
+      },
+      {
+        "command": "pastepad.toggleVisibility",
+        "title": "Toggle Visibility",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "pastepad.togglePasteGrouping",
+        "title": "Toggle Paste Grouping by Visibility"
+      },
+      {
+        "command": "pastepad.toggleDefaultListing",
+        "title": "Toggle Default Listing for New Pastes"
+      },
+      {
+        "command": "pastepad.showPasteStats",
+        "title": "Show Paste Statistics"
       }
     ],
     "views": {
@@ -108,9 +125,14 @@
           "group": "inline@1"
         },
         {
-          "command": "pastepad.deletePaste",
+          "command": "pastepad.toggleVisibility",
           "when": "view == pastepad.pastebin && viewItem == paste",
           "group": "inline@2"
+        },
+        {
+          "command": "pastepad.deletePaste",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "inline@3"
         }
       ],
       "editor/title": [

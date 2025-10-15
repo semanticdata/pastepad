@@ -296,6 +296,88 @@ export function registerPasteCommands(
         }
     });
 
+    // Toggle paste visibility command
+    const toggleVisibilityCommand = vscode.commands.registerCommand('pastepad.toggleVisibility', async (item: any) => {
+        try {
+            const title = item?.pasteData?.title || item?.title;
+            if (!title) {
+                await errorHandler.handleError(
+                    errorHandler.createError(
+                        ErrorType.USER_INPUT,
+                        ErrorSeverity.LOW,
+                        'No paste title provided',
+                        'Unable to toggle visibility - no title specified'
+                    )
+                );
+                return;
+            }
+
+            if (!await authManager.isAuthenticated()) {
+                await errorHandler.handleError(
+                    errorHandler.createError(
+                        ErrorType.AUTHENTICATION,
+                        ErrorSeverity.MEDIUM,
+                        'Not authenticated',
+                        'Please authenticate first to change paste visibility'
+                    )
+                );
+                return;
+            }
+
+            // Get current paste data to determine current visibility
+            const paste = await api.getPaste(title, true);
+            if (!paste) {
+                vscode.window.showErrorMessage(`Could not find paste "${title}"`);
+                return;
+            }
+
+            const currentlyListed = paste.listed === 1 || paste.listed === '1';
+            const newListedState = !currentlyListed;
+            const visibilityText = newListedState ? 'listed (public)' : 'unlisted (private)';
+
+            const confirmation = await vscode.window.showInformationMessage(
+                `Change "${title}" to ${visibilityText}?`,
+                { modal: true },
+                'Confirm',
+                'Cancel'
+            );
+
+            if (confirmation !== 'Confirm') {
+                return;
+            }
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Changing "${title}" to ${visibilityText}...`,
+                cancellable: false
+            }, async () => {
+                // Use the delete-and-recreate workaround to change visibility
+                const address = await authManager.getAddress();
+                if (!address) {
+                    throw new Error('No address found');
+                }
+
+                // Delete the existing paste
+                await api.deletePaste(title);
+
+                // Recreate with new visibility setting
+                await api.createPaste(title, paste.content, newListedState);
+            });
+
+            vscode.window.showInformationMessage(
+                `Successfully changed "${title}" to ${visibilityText}`
+            );
+
+            await pastebinProvider.forceRefresh();
+
+        } catch (error) {
+            await errorHandler.handleError(error as Error, {
+                operation: 'toggleVisibility',
+                title: item?.pasteData?.title || item?.title
+            });
+        }
+    });
+
     // Force sync command
     const forceSyncCommand = vscode.commands.registerCommand('pastepad.forceSync', async () => {
         try {
@@ -364,6 +446,7 @@ export function registerPasteCommands(
         newPasteCommand,
         deletePasteCommand,
         savePasteCommand,
+        toggleVisibilityCommand,
         forceSyncCommand
     );
 
