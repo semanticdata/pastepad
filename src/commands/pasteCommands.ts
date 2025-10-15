@@ -133,6 +133,8 @@ export function registerPasteCommands(
                                 cancellable: false
                             }, async () => {
                                 await api.createPaste(title, content, isListed);
+                                // Small delay to ensure API has processed the paste visibility
+                                await new Promise(resolve => setTimeout(resolve, 200));
                             });
 
                             vscode.window.showInformationMessage(`Successfully created ${isListed ? 'listed' : 'unlisted'} paste "${title}"`);
@@ -142,9 +144,9 @@ export function registerPasteCommands(
                             const doc = await vscode.workspace.openTextDocument(uri);
                             await vscode.window.showTextDocument(doc, { preview: false });
 
-                            // Add to recently opened and refresh tree
+                            // Add to recently opened and force refresh tree with fresh data
                             await stateManager.addRecentlyOpenedPaste(title);
-                            pastebinProvider.refresh();
+                            await pastebinProvider.forceRefresh();
 
                             resolve();
                         } catch (error) {
@@ -285,6 +287,8 @@ export function registerPasteCommands(
 
             const title = activeEditor.document.uri.path.substring(1);
             await activeEditor.document.save();
+            // Small delay to ensure API has processed the paste visibility
+            await new Promise(resolve => setTimeout(resolve, 200));
             vscode.window.showInformationMessage(`Successfully saved "${title}"`);
             await pastebinProvider.forceRefresh();
 
@@ -331,7 +335,7 @@ export function registerPasteCommands(
                 return;
             }
 
-            const currentlyListed = paste.listed === 1 || paste.listed === '1';
+            const currentlyListed = paste.listed === true;
             const newListedState = !currentlyListed;
             const visibilityText = newListedState ? 'listed (public)' : 'unlisted (private)';
 
@@ -351,17 +355,11 @@ export function registerPasteCommands(
                 title: `Changing "${title}" to ${visibilityText}...`,
                 cancellable: false
             }, async () => {
-                // Use the delete-and-recreate workaround to change visibility
-                const address = await authManager.getAddress();
-                if (!address) {
-                    throw new Error('No address found');
-                }
+                // Update the paste with new visibility setting
+                await api.updatePaste(title, paste.content, newListedState);
 
-                // Delete the existing paste
-                await api.deletePaste(title);
-
-                // Recreate with new visibility setting
-                await api.createPaste(title, paste.content, newListedState);
+                // Small delay to ensure API has processed the paste visibility
+                await new Promise(resolve => setTimeout(resolve, 200));
             });
 
             vscode.window.showInformationMessage(

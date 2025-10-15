@@ -49,7 +49,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 		if (element && element.itemType === 'group' && element.children) {
 			return element.children.map(paste => {
 				const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
-				const isListed = paste.listed === 1 || paste.listed === '1';
+				const isListed = paste.listed === true;
 				const visibilityIcon = isListed ? '🌐' : '🔒';
 				const tooltip = `${visibilityIcon} ${isListed ? 'Listed' : 'Unlisted'} • Modified: ${modifiedDate.toLocaleString()}`;
 
@@ -95,7 +95,7 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 
 				return sortedPastes.map(paste => {
 					const modifiedDate = new Date(parseInt(paste.modified_on) * 1000);
-					const isListed = paste.listed === 1 || paste.listed === '1';
+					const isListed = paste.listed === true;
 					const visibilityIcon = isListed ? '🌐' : '🔒';
 					const tooltip = `${visibilityIcon} ${isListed ? 'Listed' : 'Unlisted'} • Modified: ${modifiedDate.toLocaleString()}`;
 
@@ -146,8 +146,8 @@ export class PastebinProvider implements vscode.TreeDataProvider<PasteTreeItem> 
 	}
 
 	private createGroupedTreeItems(pastes: PasteItem[], sortBy: 'modified' | 'name' | 'created'): PasteTreeItem[] {
-		const listedPastes = pastes.filter(paste => paste.listed === 1 || paste.listed === '1');
-		const unlistedPastes = pastes.filter(paste => paste.listed === 0 || paste.listed === '0' || !paste.listed);
+		const listedPastes = pastes.filter(paste => paste.listed === true);
+		const unlistedPastes = pastes.filter(paste => paste.listed === false || paste.listed === undefined);
 
 		const groups: PasteTreeItem[] = [];
 
@@ -218,7 +218,7 @@ export class PasteTreeItem extends vscode.TreeItem {
 			this.contextValue = 'group';
 		} else if (isPaste) {
 			// Set icon based on visibility
-			const isListed = pasteData?.listed === 1 || pasteData?.listed === '1';
+			const isListed = pasteData?.listed === true;
 			this.iconPath = new vscode.ThemeIcon(isListed ? 'globe' : 'lock');
 			this.contextValue = 'paste';
             this.command = {

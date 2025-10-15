@@ -93,12 +93,7 @@ suite('API Visibility Preservation Tests', () => {
                     }
                 })
             },
-            // Mock the DELETE API call
-            {
-                ok: true,
-                json: async () => ({ success: true })
-            },
-            // Mock the recreate API call
+            // Mock the update API call
             {
                 ok: true,
                 json: async () => ({ success: true })
@@ -108,21 +103,17 @@ suite('API Visibility Preservation Tests', () => {
         // Try to update an unlisted paste
         await api.updatePaste('unlisted-test-paste', 'updated content');
 
-        // Verify that 3 fetch calls were made (1 to check visibility, 1 to delete, 1 to recreate)
-        assert.strictEqual(fetchCalls.length, 3, 'Should have made 3 API calls');
+        // Verify that 2 fetch calls were made (1 to check visibility, 1 to update)
+        assert.strictEqual(fetchCalls.length, 2, 'Should have made 2 API calls');
 
         // Verify first call is to get listed pastes
         assert.strictEqual(fetchCalls[0].url, 'https://api.omg.lol/address/testuser/pastebin', 'First call should get listed pastes');
 
-        // Verify second call is the delete
-        assert.strictEqual(fetchCalls[1].url, 'https://api.omg.lol/address/testuser/pastebin/unlisted-test-paste', 'Second call should delete paste');
-        assert.strictEqual(fetchCalls[1].options.method, 'DELETE', 'Should use DELETE method');
+        // Verify second call is the update with listed: false (unlisted)
+        assert.strictEqual(fetchCalls[1].url, 'https://api.omg.lol/address/testuser/pastebin/', 'Second call should update paste');
+        assert.strictEqual(fetchCalls[1].options.method, 'POST', 'Should use POST method');
 
-        // Verify third call is the recreate with listed: 0 (unlisted)
-        assert.strictEqual(fetchCalls[2].url, 'https://api.omg.lol/address/testuser/pastebin/', 'Third call should recreate paste');
-        assert.strictEqual(fetchCalls[2].options.method, 'POST', 'Should use POST method');
-
-        const requestBody = JSON.parse(fetchCalls[2].options.body);
+        const requestBody = JSON.parse(fetchCalls[1].options.body);
         assert.strictEqual(requestBody.title, 'unlisted-test-paste', 'Should update correct paste');
         assert.strictEqual(requestBody.content, 'updated content', 'Should update content');
         assert.strictEqual(requestBody.listed, false, 'Should preserve unlisted visibility (listed: false)');
@@ -143,12 +134,7 @@ suite('API Visibility Preservation Tests', () => {
                     }
                 })
             },
-            // Mock the DELETE API call
-            {
-                ok: true,
-                json: async () => ({ success: true })
-            },
-            // Mock the recreate API call
+            // Mock the update API call
             {
                 ok: true,
                 json: async () => ({ success: true })
@@ -159,10 +145,10 @@ suite('API Visibility Preservation Tests', () => {
         await api.updatePaste('listed-test-paste', 'updated content');
 
         // Verify the calls
-        assert.strictEqual(fetchCalls.length, 3, 'Should have made 3 API calls');
+        assert.strictEqual(fetchCalls.length, 2, 'Should have made 2 API calls');
 
-        // Verify third call has listed: true (listed)
-        const requestBody = JSON.parse(fetchCalls[2].options.body);
+        // Verify second call has listed: true (listed)
+        const requestBody = JSON.parse(fetchCalls[1].options.body);
         assert.strictEqual(requestBody.listed, true, 'Should preserve listed visibility (listed: true)');
     });
 
@@ -174,12 +160,7 @@ suite('API Visibility Preservation Tests', () => {
                 status: 500,
                 json: async () => ({ error: 'Server error' })
             },
-            // Mock the DELETE API call
-            {
-                ok: true,
-                json: async () => ({ success: true })
-            },
-            // Mock the recreate API call
+            // Mock the update API call
             {
                 ok: true,
                 json: async () => ({ success: true })
@@ -190,10 +171,10 @@ suite('API Visibility Preservation Tests', () => {
         await api.updatePaste('unknown-paste', 'updated content');
 
         // Verify the calls
-        assert.strictEqual(fetchCalls.length, 3, 'Should have made 3 API calls');
+        assert.strictEqual(fetchCalls.length, 2, 'Should have made 2 API calls');
 
         // Should default to unlisted for safety
-        const requestBody = JSON.parse(fetchCalls[2].options.body);
+        const requestBody = JSON.parse(fetchCalls[1].options.body);
         assert.strictEqual(requestBody.listed, false, 'Should default to unlisted when visibility check fails');
     });
 
