@@ -225,7 +225,12 @@ export class OmgLolApi {
             vscode.window.showInformationMessage(`Creating "${title}" as ${shouldList ? 'listed' : 'unlisted'}`);
 
             const result = await this.retryManager.retryApiCall(async () => {
-                const requestBody = { title, content, listed: shouldList };
+                // The API expects 'listed' as 1 for listed, or omitted/0 for unlisted
+                const requestBody: any = { title, content };
+                if (shouldList) {
+                    requestBody.listed = 1;
+                }
+                // Omit 'listed' entirely for unlisted pastes
                 console.log(`CREATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
 
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
@@ -280,25 +285,32 @@ export class OmgLolApi {
             let shouldList = listed;
             if (shouldList === undefined) {
                 try {
-                    const listedResponse = await fetch(`${API_URL}/address/${address}/pastebin`);
-                    if (listedResponse.ok) {
-                        const listedData = await listedResponse.json() as GetPastesResponse;
-                        const listedPastes = listedData.response.pastebin || [];
-                        shouldList = listedPastes.some(paste => paste.title === title);
+                    // Get the existing paste to determine its current visibility
+                    const existingPaste = await this.getPaste(title);
+                    if (existingPaste && existingPaste.listed !== undefined) {
+                        shouldList = existingPaste.listed;
+                        console.log(`Preserving existing visibility for "${title}": ${shouldList}`);
                     } else {
-                        // Default to unlisted if we can't determine
+                        // If we can't determine, default to unlisted for safety
                         shouldList = false;
+                        console.log(`Could not determine visibility for "${title}", defaulting to unlisted`);
                     }
-                } catch {
+                } catch (error) {
                     // Default to unlisted if there's an error
                     shouldList = false;
+                    console.log(`Error determining visibility for "${title}", defaulting to unlisted:`, error);
                 }
             }
 
             console.log(`Updating paste "${title}" with listed=${shouldList}`);
 
             const result = await this.retryManager.retryApiCall(async () => {
-                const requestBody = { title, content, listed: shouldList };
+                // The API expects 'listed' as 1 for listed, or omitted/0 for unlisted
+                const requestBody: any = { title, content };
+                if (shouldList) {
+                    requestBody.listed = 1;
+                }
+                // Omit 'listed' entirely for unlisted pastes
                 console.log(`UPDATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
 
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {

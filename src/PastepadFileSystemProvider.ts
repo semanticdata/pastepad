@@ -59,7 +59,11 @@ export class PastepadFileSystemProvider implements vscode.FileSystemProvider {
             if (pasteExists) {
                 console.log(`Paste "${title}" exists, calling updatePaste to preserve visibility`);
                 vscode.window.showInformationMessage(`Updating existing paste "${title}" (preserving visibility)`);
-                await this.api.updatePaste(title, newContent);
+                // Get the existing paste to preserve its visibility status
+                const existingPaste = await this.api.getPaste(title);
+                const currentListedStatus = existingPaste?.listed;
+                console.log(`Current listed status for "${title}": ${currentListedStatus}`);
+                await this.api.updatePaste(title, newContent, currentListedStatus);
                 this._emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
             } else {
                 console.log(`Paste "${title}" doesn't exist, calling createPaste`);
