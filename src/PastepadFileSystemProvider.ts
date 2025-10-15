@@ -83,7 +83,8 @@ export class PastepadFileSystemProvider implements vscode.FileSystemProvider {
 
         const paste = await this.api.getPaste(oldTitle);
         if (paste) {
-            await this.api.createPaste(newTitle, paste.content);
+            // Preserve the visibility status when renaming
+            await this.api.createPaste(newTitle, paste.content, paste.listed);
             await this.api.deletePaste(oldTitle);
             this._emitter.fire([
                 { type: vscode.FileChangeType.Deleted, uri: oldUri },
