@@ -221,11 +221,11 @@ export class OmgLolApi {
                 shouldList = preferences.defaultListNewPastes ?? false; // Default to unlisted for safety
             }
 
-            console.log(`Creating new paste "${title}" with listed=${shouldList ? 1 : 0}`);
+            console.log(`Creating new paste "${title}" with listed=${shouldList}`);
             vscode.window.showInformationMessage(`Creating "${title}" as ${shouldList ? 'listed' : 'unlisted'}`);
 
             const result = await this.retryManager.retryApiCall(async () => {
-                const requestBody = { title, content, listed: shouldList ? 1 : 0 };
+                const requestBody = { title, content, listed: shouldList };
                 console.log(`CREATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
 
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
@@ -277,8 +277,8 @@ export class OmgLolApi {
             }
 
             // CRITICAL: We must preserve the current visibility status
-            // The API seems to default to listed=1 if not specified, so we need to explicitly preserve it
-            let listed = 0; // Default to unlisted for safety
+            // The API seems to default to listed=true if not specified, so we need to explicitly preserve it
+            let listed = false; // Default to unlisted for safety
 
             try {
                 // Make a synchronous call to get just the listed pastes to determine current visibility
@@ -287,7 +287,7 @@ export class OmgLolApi {
                     const listedData = await listedResponse.json() as GetPastesResponse;
                     const listedPastes = listedData.response.pastebin || [];
                     const isCurrentlyListed = listedPastes.some(paste => paste.title === title);
-                    listed = isCurrentlyListed ? 1 : 0;
+                    listed = isCurrentlyListed;
 
                     console.log(`LISTED PASTES:`, listedPastes.map(p => p.title));
                     console.log(`Looking for paste: "${title}"`);

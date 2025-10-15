@@ -125,7 +125,7 @@ suite('API Visibility Preservation Tests', () => {
         const requestBody = JSON.parse(fetchCalls[2].options.body);
         assert.strictEqual(requestBody.title, 'unlisted-test-paste', 'Should update correct paste');
         assert.strictEqual(requestBody.content, 'updated content', 'Should update content');
-        assert.strictEqual(requestBody.listed, 0, 'Should preserve unlisted visibility (listed: 0)');
+        assert.strictEqual(requestBody.listed, false, 'Should preserve unlisted visibility (listed: false)');
     });
 
     test('updatePaste should preserve listed visibility', async () => {
@@ -161,9 +161,9 @@ suite('API Visibility Preservation Tests', () => {
         // Verify the calls
         assert.strictEqual(fetchCalls.length, 3, 'Should have made 3 API calls');
 
-        // Verify third call has listed: 1 (listed)
+        // Verify third call has listed: true (listed)
         const requestBody = JSON.parse(fetchCalls[2].options.body);
-        assert.strictEqual(requestBody.listed, 1, 'Should preserve listed visibility (listed: 1)');
+        assert.strictEqual(requestBody.listed, true, 'Should preserve listed visibility (listed: true)');
     });
 
     test('updatePaste should default to unlisted when visibility check fails', async () => {
@@ -194,7 +194,7 @@ suite('API Visibility Preservation Tests', () => {
 
         // Should default to unlisted for safety
         const requestBody = JSON.parse(fetchCalls[2].options.body);
-        assert.strictEqual(requestBody.listed, 0, 'Should default to unlisted when visibility check fails');
+        assert.strictEqual(requestBody.listed, false, 'Should default to unlisted when visibility check fails');
     });
 
     test('createPaste should respect explicit visibility setting', async () => {
@@ -216,6 +216,6 @@ suite('API Visibility Preservation Tests', () => {
         const requestBody = JSON.parse(fetchCalls[0].options.body);
         assert.strictEqual(requestBody.title, 'new-paste', 'Should create correct paste');
         assert.strictEqual(requestBody.content, 'content', 'Should have correct content');
-        assert.strictEqual(requestBody.listed, 0, 'Should be unlisted when explicitly set to false');
+        assert.strictEqual(requestBody.listed, false, 'Should be unlisted when explicitly set to false');
     });
 });
