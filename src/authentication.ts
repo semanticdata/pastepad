@@ -16,8 +16,6 @@ const ACCESS_TOKEN_KEY = 'omglol.accessToken';
 const REFRESH_TOKEN_KEY = 'omglol.refreshToken';
 const ADDRESS_KEY = 'omglol.address';
 
-type AuthMethod = 'oauth' | 'apikey';
-
 interface TokenResponse {
     response: {
         access_token: string;
