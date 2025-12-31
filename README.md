@@ -2,72 +2,70 @@
 
 **Manage your omg.lol pastebin directly from VS Code.**
 
-`PastePad` is a VS Code extension that allows you to seamlessly interact with your `omg.lol` pastebin without leaving your editor. View, create, edit, and delete your pastes with ease.
+PastePad is a VS Code extension that allows you to seamlessly interact with your [omg.lol](https://omg.lol/) [pastebin](https://paste.lol/) without leaving your editor. View, create, edit, and delete your pastes with ease.
 
 ## Features
 
-* **Authentication:** Securely authenticate with your `omg.lol` account.
-* **Paste Listing:** View all your pastes in a convenient tree view in the activity bar.
-* **Create & Edit:** Create new pastes and edit existing ones directly in VS Code.
-* **Save & Delete:** Save your changes back to your pastebin or delete pastes you no longer need.
-* **Auto-Sync:** Changes to your pastes are automatically synced.
-* **Language Detection:** Automatic language detection for syntax highlighting based on the paste title's file extension.
-* **Refresh & Logout:** Easily refresh your paste list and log out of your account.
+PastePad puts your omg.lol pastebin right in VS Code so you can work with code snippets without switching contexts.
+
+- **Browse pastes** from the activity bar tree view
+- **Create new pastes** or edit existing ones as editor tabs
+- **Save changes** with `Ctrl+S` – they sync back to your pastebin automatically
+- **Toggle visibility** to make pastes public (listed) or private (unlisted)
+- **Group pastes** by visibility status to keep things organized
+- **Force sync** with `Ctrl+Shift+S` when you need immediate control
+- **Syntax highlighting** detects the language from your paste title's file extension
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- An [omg.lol](https://omg.lol/) account
+- Visual Studio Code version 1.104.0 or higher
 
-## Extension Settings
+## Installation
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+> [!NOTE]
+> PastePad is not yet available in the VS Code Marketplace. To install it manually, follow these steps:
 
-For example:
+1. Clone this repository: `git clone https://github.com/semanticdata/pastepad.git`
+2. Open the repository in VS Code
+3. Press `F5` to launch the extension in a new VS Code window (Extension Development Host)
+4. The extension will be loaded and ready to use in the new window
 
-This extension contributes the following settings:
+## Usage
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+### Getting Started
 
-## Known Issues
+1. Install the extension
+2. Click the PastePad icon in the activity bar
+3. Click "Authenticate with omg.lol" and sign in
+4. Your pastes will appear in the tree view
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+### Commands
 
-## Release Notes
+- **New Paste** - Create a new paste (click the + icon in the tree view)
+- **Open Paste** - Open a paste for editing (click the paste title)
+- **Save Paste** - Save changes (`Ctrl+S` or click the save icon)
+- **Force Sync** - Manually sync changes (`Ctrl+Shift+S`)
+- **Toggle Visibility** - Switch a paste between listed/unlisted
+- **Delete Paste** - Remove a paste
+- **Refresh** - Refresh the paste list
+- **Logout** - Sign out of your omg.lol account
 
-Users appreciate release notes as you update your extension.
+### Keyboard Shortcuts
 
-### 1.0.0
+| Command    | Shortcut       |
+| ---------- | -------------- |
+| Save Paste | `Ctrl+S`       |
+| Force Sync | `Ctrl+Shift+S` |
 
-Initial release of ...
+## Notes
 
-### 1.0.1
+This extension uses the undocumented `listed` attribute implementation from [omglolapi](https://github.com/rknightuk/omglolcli).
 
-Fixed issue #.
+## License
 
-### 1.1.0
+[MIT License](LICENSE)
 
-Added features X, Y, and Z.
+## Community & Support
 
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+PastePad is a free and open-source project built for the [omg.lol](https://omg.lol/) community. We believe in the power of collaboration and welcome contributions of all kinds. Whether you're a developer, a designer, or just an enthusiastic user, you can help shape the future of this extension.
