@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-First public release! PastePad allows you to manage your omg.lol pastebin directly from VS Code.
+First public release! PastePad allows you to manage your [omg.lol](https://omg.lol/) pastebin directly from VS Code.
 
 ### Added
 
@@ -19,6 +19,7 @@ First public release! PastePad allows you to manage your omg.lol pastebin direct
 - Updated test mocks to match new API response structure with RetryManager
 - Fixed workspaceState mocking for synchronous state management
 - Removed boilerplate sample test
+- Added debug configuration for running tests with `--disable-extensions`
 
 ### Removed
 
@@ -44,7 +45,7 @@ First public release! PastePad allows you to manage your omg.lol pastebin direct
 ### Added
 
 - Initial project scaffolding with [Yeoman](https://yeoman.io/) and [VS Code Extension Generator](https://www.npmjs.com/package/generator-code)
-- Authentication with [omg.lol](https://omg.lol/) account
+- Authentication with omg.lol account
 - Paste listing in activity bar tree view
 - Create, edit, save, and delete pastes
 - Auto-sync changes
