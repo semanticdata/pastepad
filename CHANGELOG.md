@@ -11,7 +11,7 @@ First public release! PastePad allows you to manage your omg.lol pastebin direct
 
 ### Added
 
-- Initial test suite covering API visibility preservation and paste creation
+- Test suite covering API visibility preservation, paste creation, and deletion (6 tests)
 
 ### Changed
 

@@ -53,10 +53,6 @@ suite('API Visibility Preservation Tests', () => {
             }
         };
 
-        mockWorkspaceState._data = {
-            userPreferences: { defaultListNewPastes: false }
-        };
-
         mockContext = {
             subscriptions: [],
             workspaceState: mockWorkspaceState,
@@ -86,6 +82,11 @@ suite('API Visibility Preservation Tests', () => {
             storageUri: vscode.Uri.file('/test/storage'),
             globalStorageUri: vscode.Uri.file('/test/global'),
             logUri: vscode.Uri.file('/test/log')
+        };
+
+        // Reset workspace state data for each test
+        mockContext.workspaceState._data = {
+            userPreferences: { defaultListNewPastes: false }
         };
 
         // Initialize services with the mock context
@@ -301,5 +302,20 @@ suite('API Visibility Preservation Tests', () => {
 
         const requestBody = JSON.parse(fetchCalls[0].options.body);
         assert.strictEqual(requestBody.listed, 1, 'Should include listed=1 for listed pastes');
+    });
+
+    test('deletePaste should call correct API endpoint', async () => {
+        mockFetchResponses = [
+            {
+                ok: true,
+                json: async () => ({ request: { success: true } })
+            }
+        ];
+
+        await api.deletePaste('paste-to-delete');
+
+        assert.strictEqual(fetchCalls.length, 1, 'Should have made 1 API call');
+        assert.strictEqual(fetchCalls[0].url, 'https://api.omg.lol/address/testuser/pastebin/paste-to-delete', 'Should call delete endpoint');
+        assert.strictEqual(fetchCalls[0].options.method, 'DELETE', 'Should use DELETE method');
     });
 });
