@@ -6,7 +6,7 @@
   "publisher": "semanticdata",
   "repository": "https://github.com/semanticdata/pastepad",
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.107.1"
   },
   "categories": [
     "Snippets",

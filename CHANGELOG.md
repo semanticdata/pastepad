@@ -1,9 +1,51 @@
-# Change Log
+# Changelog
 
-All notable changes to the "pastepad" extension will be documented in this file.
+All notable changes to this project extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-- Initial release
+First public release! PastePad allows you to manage your omg.lol pastebin directly from VS Code.
+
+### Added
+
+- Initial test suite covering API visibility preservation and paste creation
+
+### Changed
+
+- Updated test mocks to match new API response structure with RetryManager
+- Fixed workspaceState mocking for synchronous state management
+- Removed boilerplate sample test
+
+### Removed
+
+- Reference files and documentation (Postman collections, GistPad reference code, omg.lol API reference)
+
+## [0.0.1] - 2025-10-15
+
+### Added
+
+- Toggle paste visibility (listed/unlisted)
+- Paste grouping and statistics
+- Force sync option (`Ctrl+Shift+S`)
+
+### Changed
+
+- Migrated to FileSystemProvider for better file handling
+- Simplified authentication system
+- Improved error handling and retry logic
+- Better unsaved state tracking
+
+## [0.0.0] - 2025-09-28
+
+### Added
+
+- Initial project scaffolding with [Yeoman](https://yeoman.io/) and [VS Code Extension Generator](https://www.npmjs.com/package/generator-code)
+- Authentication with [omg.lol](https://omg.lol/) account
+- Paste listing in activity bar tree view
+- Create, edit, save, and delete pastes
+- Auto-sync changes
+- Language detection based on paste title file extension
+- Keyboard shortcuts (`Ctrl+S` to save)
