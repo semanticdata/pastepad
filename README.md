@@ -1,3 +1,6 @@
+> [!WARNING]
+> PastePad is still in early development and may contain bugs or incomplete features. See the [TODO list](#todo).
+
 # PastePad
 
 **Manage your omg.lol pastebin directly from VS Code.**
@@ -62,6 +65,8 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 
 This extension uses the undocumented `listed` attribute implementation from [omglolapi](https://github.com/rknightuk/omglolcli).
 
+Inspired by [GistPad](https://github.com/lostintangent/gistpad).
+
 ## License
 
 [MIT License](LICENSE)
@@ -69,3 +74,20 @@ This extension uses the undocumented `listed` attribute implementation from [omg
 ## Community & Support
 
 PastePad is a free and open-source project built for the [omg.lol](https://omg.lol/) community. We believe in the power of collaboration and welcome contributions of all kinds. Whether you're a developer, a designer, or just an enthusiastic user, you can help shape the future of this extension.
+
+<details>
+<summary><h2>TODO</h2></summary>
+
+Some items remaining before release:
+
+- [ ] Update version to 1.0.0
+- [ ] Create extension icons
+- [ ] Take screenshots for documentation
+- [ ] Consider lowering VS Code minimum version
+- [ ] Revisit keywords and categories
+- [ ] Revisit marketing copy
+- [ ] Consider testing on different VS Code versions
+- [ ] Submit to VS Code Marketplace
+- [ ] Consider migrating source code to [SourceTube](https://source.tube/)
+
+</details>
