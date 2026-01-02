@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> OAuth authentication is not yet available. PastePad currently supports API Key authentication only. Please use "Sign in with API Key" to authenticate.
+
 > [!WARNING]
 > PastePad is still in early development and may contain bugs or incomplete features. See the [TODO list](#todo).
 
@@ -80,13 +83,17 @@ PastePad is a free and open-source project built for the [omg.lol](https://omg.l
 
 Some items remaining before release:
 
+- [ ] Set up OAuth application with omg.lol and configure credentials in [authentication.ts](src/authentication.ts)
+- [ ] Remove debug console.log statements
 - [ ] Update version to 1.0.0
 - [ ] Create extension icons
 - [ ] Take screenshots for documentation
-- [ ] Consider lowering VS Code minimum version
-- [ ] Revisit keywords and categories
-- [ ] Revisit marketing copy
-- [ ] Consider testing on different VS Code versions
+- [ ] Lower VS Code minimum version for compatibility
+- [x] Revisit keywords and categories
+- [x] Revisit marketing copy
+- [ ] Test on different VS Code versions
+- [x] Create simple CONTRIBUTING.md
+- [x] Consider creating SECURITY.md
 - [ ] Submit to VS Code Marketplace
 - [ ] Consider migrating source code to [SourceTube](https://source.tube/)
 
