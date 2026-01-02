@@ -84,7 +84,7 @@ PastePad is a free and open-source project built for the [omg.lol](https://omg.l
 Some items remaining before release:
 
 - [ ] Set up OAuth application with omg.lol and configure credentials in [authentication.ts](src/authentication.ts)
-- [ ] Remove debug console.log statements
+- [x] Remove debug console.log statements
 - [ ] Update version to 1.0.0
 - [ ] Create extension icons
 - [ ] Take screenshots for documentation
