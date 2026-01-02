@@ -1,12 +1,16 @@
 import * as vscode from 'vscode';
 import { OmgLolApi } from './api';
 import { PasteItem } from './types';
+import { LoggerService } from './services';
 
 export class PastepadFileSystemProvider implements vscode.FileSystemProvider {
     private _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
     readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._emitter.event;
+    private logger: LoggerService;
 
-    constructor(private api: OmgLolApi) {}
+    constructor(private api: OmgLolApi) {
+        this.logger = LoggerService.getInstance();
+    }
 
     watch(uri: vscode.Uri, options: { recursive: boolean; excludes: string[]; }): vscode.Disposable {
         return new vscode.Disposable(() => {});
@@ -38,41 +42,40 @@ export class PastepadFileSystemProvider implements vscode.FileSystemProvider {
         const title = uri.path.substring(1);
         const newContent = content.toString();
 
-        console.log(`FileSystemProvider.writeFile called for "${title}", create: ${options.create}, overwrite: ${options.overwrite}`);
-        console.log(`Content length: ${content.length}, content: "${newContent}"`);
+        this.logger.debug('File write operation started', { title, contentLength: content.length, create: options.create, overwrite: options.overwrite });
 
         try {
             // CRITICAL FIX: Always check if paste already exists, regardless of options.create
             // VS Code sometimes calls with create: true even for existing files
             let pasteExists = false;
             try {
-                console.log(`Checking if paste "${title}" exists...`);
+                this.logger.debug('Checking paste existence', { title });
                 const existingPaste = await this.api.getPaste(title);
                 pasteExists = !!existingPaste;
-                console.log(`Paste "${title}" exists: ${pasteExists}`);
+                this.logger.debug('Paste existence check result', { title, exists: pasteExists });
             } catch (error) {
                 // If we can't determine, assume it doesn't exist
-                console.log(`Error checking if paste "${title}" exists, assuming it doesn't exist:`, error);
+                this.logger.debug('Error checking paste existence, assuming it does not exist', { title, error });
                 pasteExists = false;
             }
 
             if (pasteExists) {
-                console.log(`Paste "${title}" exists, calling updatePaste to preserve visibility`);
+                this.logger.info('Updating existing paste', { title });
                 vscode.window.showInformationMessage(`Updating existing paste "${title}" (preserving visibility)`);
                 // Get the existing paste to preserve its visibility status
                 const existingPaste = await this.api.getPaste(title);
                 const currentListedStatus = existingPaste?.listed;
-                console.log(`Current listed status for "${title}": ${currentListedStatus}`);
+                this.logger.debug('Current visibility status', { title, listed: currentListedStatus });
                 await this.api.updatePaste(title, newContent, currentListedStatus);
                 this._emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
             } else {
-                console.log(`Paste "${title}" doesn't exist, calling createPaste`);
+                this.logger.info('Creating new paste', { title });
                 vscode.window.showInformationMessage(`Creating new paste "${title}"`);
                 await this.api.createPaste(title, newContent);
                 this._emitter.fire([{ type: vscode.FileChangeType.Created, uri }]);
             }
         } catch (error) {
-            console.error(`Error in writeFile for "${title}":`, error);
+            this.logger.error('File write operation failed', { title, error });
             throw new vscode.FileSystemError(error as any);
         }
     }
