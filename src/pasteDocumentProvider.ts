@@ -1,13 +1,17 @@
 import * as vscode from 'vscode';
 import { OmgLolApi } from './api';
 import { getLanguageFromTitle } from './languageDetection';
+import { LoggerService } from './services';
 
 export class PasteDocumentProvider implements vscode.TextDocumentContentProvider {
 	private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
 	private openPastes = new Map<string, string>(); // URI string -> paste title
 	private pasteContent = new Map<string, string>(); // paste title -> content
+	private logger: LoggerService;
 
-	constructor(private api: OmgLolApi) {}
+	constructor(private api: OmgLolApi) {
+		this.logger = LoggerService.getInstance();
+	}
 
 	get onDidChange(): vscode.Event<vscode.Uri> {
 		return this._onDidChange.event;
@@ -89,7 +93,7 @@ export class PasteDocumentProvider implements vscode.TextDocumentContentProvider
 			return editor;
 
 		} catch (error) {
-			console.error('Error opening paste:', error);
+			this.logger.error('Paste document opening failed', { error });
 			vscode.window.showErrorMessage(`Failed to open paste: ${error}`);
 			return null;
 		}

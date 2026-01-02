@@ -1,5 +1,6 @@
 import { ErrorHandler, ErrorType, ErrorSeverity } from './errorHandler';
 import { StateManager } from './stateManager';
+import { LoggerService } from './loggerService';
 
 export interface RetryOptions {
     maxAttempts?: number;
@@ -24,6 +25,7 @@ export class RetryManager {
     private static instance: RetryManager | undefined;
     private errorHandler: ErrorHandler;
     private stateManager: StateManager;
+    private logger: LoggerService;
 
     // Default retry configuration
     private static readonly DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'retryCondition' | 'onRetry' | 'timeout'>> = {
@@ -37,6 +39,7 @@ export class RetryManager {
     private constructor() {
         this.errorHandler = ErrorHandler.getInstance();
         this.stateManager = StateManager.getInstance();
+        this.logger = LoggerService.getInstance();
     }
 
     public static getInstance(): RetryManager {
@@ -91,7 +94,7 @@ export class RetryManager {
                     }
 
                     // Log retry attempt
-                    console.log(`Retry attempt ${attempt}/${config.maxAttempts} after ${delay}ms delay:`, lastError.message);
+                    this.logger.debug('Retry attempt', { attempt, maxAttempts: config.maxAttempts, delay, error: lastError.message });
 
                     await this.delay(delay);
                 }
@@ -144,7 +147,7 @@ export class RetryManager {
             maxDelay: 30000,
             retryCondition: (error) => this.isRetryableApiError(error),
             onRetry: (error, attempt) => {
-                console.log(`API call failed, retrying (${attempt}/3):`, error.message);
+                this.logger.debug('API call failed, retrying', { attempt, maxAttempts: 3, error: error.message });
             },
             ...options
         });

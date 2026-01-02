@@ -1,5 +1,6 @@
 import { StateManager } from './stateManager';
 import { PasteItem } from '../types';
+import { LoggerService } from './loggerService';
 
 export interface CacheEntry<T> {
     data: T;
@@ -17,6 +18,7 @@ export interface CacheOptions {
 export class CacheManager {
     private static instance: CacheManager | undefined;
     private stateManager: StateManager;
+    private logger: LoggerService;
 
     // Default TTL values (in milliseconds)
     private static readonly DEFAULT_TTL = {
@@ -28,6 +30,7 @@ export class CacheManager {
 
     private constructor() {
         this.stateManager = StateManager.getInstance();
+        this.logger = LoggerService.getInstance();
     }
 
     public static getInstance(): CacheManager {
@@ -54,7 +57,7 @@ export class CacheManager {
             await this.stateManager.recordPerformanceMetric(`cache_miss_${key}`, 0);
             return undefined;
         } catch (error) {
-            console.error(`Cache get error for key ${key}:`, error);
+            this.logger.error('Cache get operation failed', { key, error });
             return undefined;
         }
     }
@@ -66,7 +69,7 @@ export class CacheManager {
             await this.stateManager.setCachedData(key, data, ttl);
             await this.stateManager.recordPerformanceMetric(`cache_set_${key}`, 0);
         } catch (error) {
-            console.error(`Cache set error for key ${key}:`, error);
+            this.logger.error('Cache set operation failed', { key, error });
         }
     }
 
@@ -74,7 +77,7 @@ export class CacheManager {
         try {
             await this.stateManager.clearCache(key);
         } catch (error) {
-            console.error(`Cache invalidate error for key ${key}:`, error);
+            this.logger.error('Cache invalidate operation failed', { key, error });
         }
     }
 
@@ -89,7 +92,7 @@ export class CacheManager {
 
             await Promise.all(keysToInvalidate.map(key => this.invalidate(key)));
         } catch (error) {
-            console.error(`Cache invalidate pattern error for pattern ${pattern}:`, error);
+            this.logger.error('Cache invalidate pattern operation failed', { pattern, error });
         }
     }
 
@@ -97,7 +100,7 @@ export class CacheManager {
         try {
             await this.stateManager.clearCache();
         } catch (error) {
-            console.error('Cache clear error:', error);
+            this.logger.error('Cache clear operation failed', { error });
         }
     }
 
@@ -154,7 +157,7 @@ export class CacheManager {
             }
             return undefined;
         } catch (error) {
-            console.error(`Offline cache get error for key ${key}:`, error);
+            this.logger.error('Offline cache get operation failed', { key, error });
             return undefined;
         }
     }
@@ -210,7 +213,7 @@ export class CacheManager {
                 expiredEntries: 0 // Would require more complex tracking
             };
         } catch (error) {
-            console.error('Error getting cache stats:', error);
+            this.logger.error('Cache stats retrieval failed', { error });
             return {
                 totalEntries: 0,
                 totalSize: 0,
@@ -224,7 +227,7 @@ export class CacheManager {
         try {
             await this.stateManager.clearExpiredCacheMetadata();
         } catch (error) {
-            console.error('Error cleaning up expired cache entries:', error);
+            this.logger.error('Cache cleanup operation failed', { error });
         }
     }
 
@@ -235,7 +238,7 @@ export class CacheManager {
             // to pre-load commonly accessed data
             await this.stateManager.recordPerformanceMetric('cache_warmup', Date.now());
         } catch (error) {
-            console.error('Error warming up cache:', error);
+            this.logger.error('Cache warmup operation failed', { error });
         }
     }
 

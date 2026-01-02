@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
 import { PasteItem } from './types';
-import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity } from './services';
+import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity, LoggerService } from './services';
 
 const API_URL = 'https://api.omg.lol';
 
@@ -20,12 +20,14 @@ export class OmgLolApi {
     private retryManager: RetryManager;
     private cacheManager: CacheManager;
     private stateManager: StateManager;
+    private logger: LoggerService;
 
     constructor(private authManager: AuthenticationManager) {
         this.errorHandler = ErrorHandler.getInstance();
         this.retryManager = RetryManager.getInstance();
         this.cacheManager = CacheManager.getInstance();
         this.stateManager = StateManager.getInstance();
+        this.logger = LoggerService.getInstance();
     }
 
     private async getHeaders(): Promise<{ [key: string]: string }> {
@@ -221,7 +223,7 @@ export class OmgLolApi {
                 shouldList = preferences.defaultListNewPastes ?? false; // Default to unlisted for safety
             }
 
-            console.log(`Creating new paste "${title}" with listed=${shouldList}`);
+            this.logger.info('Creating new paste', { title, listed: shouldList });
             vscode.window.showInformationMessage(`Creating "${title}" as ${shouldList ? 'listed' : 'unlisted'}`);
 
             const result = await this.retryManager.retryApiCall(async () => {
@@ -231,7 +233,7 @@ export class OmgLolApi {
                     requestBody.listed = 1;
                 }
                 // Omit 'listed' entirely for unlisted pastes
-                console.log(`CREATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
+                this.logger.debug('API create request body', { requestBody });
 
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
                     method: 'POST',
@@ -239,16 +241,16 @@ export class OmgLolApi {
                     body: JSON.stringify(requestBody)
                 });
 
-                console.log(`CREATE RESPONSE: ${response.status} ${response.statusText}`);
+                this.logger.debug('API create response status', { status: response.status, statusText: response.statusText });
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`CREATE ERROR RESPONSE:`, errorText);
+                    this.logger.error('API create error response', { status: response.status, statusText: response.statusText, errorText });
                     throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
                 }
 
                 const responseData = await response.json();
-                console.log(`CREATE RESPONSE DATA:`, JSON.stringify(responseData, null, 2));
+                this.logger.debug('API create response data', { responseData });
                 return responseData;
             });
 
@@ -289,20 +291,20 @@ export class OmgLolApi {
                     const existingPaste = await this.getPaste(title);
                     if (existingPaste && existingPaste.listed !== undefined) {
                         shouldList = existingPaste.listed;
-                        console.log(`Preserving existing visibility for "${title}": ${shouldList}`);
+                        this.logger.debug('Preserving existing visibility', { title, listed: shouldList });
                     } else {
                         // If we can't determine, default to unlisted for safety
                         shouldList = false;
-                        console.log(`Could not determine visibility for "${title}", defaulting to unlisted`);
+                        this.logger.debug('Could not determine visibility, defaulting to unlisted', { title });
                     }
                 } catch (error) {
                     // Default to unlisted if there's an error
                     shouldList = false;
-                    console.log(`Error determining visibility for "${title}", defaulting to unlisted:`, error);
+                    this.logger.debug('Error determining visibility, defaulting to unlisted', { title, error });
                 }
             }
 
-            console.log(`Updating paste "${title}" with listed=${shouldList}`);
+            this.logger.info('Updating paste', { title, listed: shouldList });
 
             const result = await this.retryManager.retryApiCall(async () => {
                 // The API expects 'listed' as 1 for listed, or omitted/0 for unlisted
@@ -311,7 +313,7 @@ export class OmgLolApi {
                     requestBody.listed = 1;
                 }
                 // Omit 'listed' entirely for unlisted pastes
-                console.log(`UPDATE REQUEST BODY:`, JSON.stringify(requestBody, null, 2));
+                this.logger.debug('API update request body', { requestBody });
 
                 const response = await fetch(`${API_URL}/address/${address}/pastebin/`, {
                     method: 'POST',
@@ -319,16 +321,16 @@ export class OmgLolApi {
                     body: JSON.stringify(requestBody)
                 });
 
-                console.log(`UPDATE RESPONSE: ${response.status} ${response.statusText}`);
+                this.logger.debug('API update response status', { status: response.status, statusText: response.statusText });
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`UPDATE ERROR RESPONSE:`, errorText);
+                    this.logger.error('API update error response', { status: response.status, statusText: response.statusText, errorText });
                     throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
                 }
 
                 const responseData = await response.json();
-                console.log(`UPDATE RESPONSE DATA:`, JSON.stringify(responseData, null, 2));
+                this.logger.debug('API update response data', { responseData });
                 return responseData;
             });
 

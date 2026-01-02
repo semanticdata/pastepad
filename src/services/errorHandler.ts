@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { StateManager } from './stateManager';
+import { LoggerService } from './loggerService';
 
 export enum ErrorType {
     NETWORK = 'network',
@@ -41,9 +42,11 @@ export interface ErrorMetrics {
 export class ErrorHandler {
     private static instance: ErrorHandler | undefined;
     private stateManager: StateManager;
+    private logger: LoggerService;
 
     private constructor() {
         this.stateManager = StateManager.getInstance();
+        this.logger = LoggerService.getInstance();
     }
 
     public static getInstance(): ErrorHandler {
@@ -73,7 +76,7 @@ export class ErrorHandler {
             try {
                 await pastepadError.recoveryAction();
             } catch (recoveryError) {
-                console.error('Recovery action failed:', recoveryError);
+                this.logger.error('Recovery action failed', { error: recoveryError });
             }
         }
     }

@@ -16,6 +16,23 @@ Contributions of all kinds are welcome.
 - Lint: `pnpm run lint`
 - Build: `pnpm run compile`
 
+## Logging
+
+Use `LoggerService` instead of `console.log()`:
+
+```typescript
+import { LoggerService } from './services';
+
+const logger = LoggerService.getInstance();
+
+logger.debug('Detailed info', { key: 'value' });  // Development only
+logger.info('User operation');                    // Normal operations
+logger.warn('Recoverable issue', { key });        // Warnings
+logger.error('Failure occurred', { error });      // Errors
+```
+
+Logs appear in the Output panel under "PastePad". Set to "debug" in [settings.json](.vscode/settings.json) or [launch.json](.vscode/launch.json) for development.
+
 ## Making Changes
 
 1. Branch: `git checkout -b feature/your-feature`

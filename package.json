@@ -107,6 +107,23 @@
         }
       ]
     },
+    "configuration": {
+      "title": "PastePad",
+      "properties": {
+        "pastepad.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Controls the verbosity of logging in the Output panel",
+          "enumDescriptions": [
+            "Show all logs including detailed debugging information",
+            "Show informational logs and above",
+            "Show warnings and errors only",
+            "Show errors only"
+          ]
+        }
+      }
+    },
     "menus": {
       "view/title": [
         {
