@@ -77,6 +77,11 @@
         "icon": "$(eye)"
       },
       {
+        "command": "pastepad.openPasteInBrowser",
+        "title": "View in Browser",
+        "icon": "$(globe)"
+      },
+      {
         "command": "pastepad.togglePasteGrouping",
         "title": "Toggle Paste Grouping by Visibility"
       },
@@ -162,6 +167,11 @@
           "command": "pastepad.deletePaste",
           "when": "view == pastepad.pastebin && viewItem == paste",
           "group": "inline@3"
+        },
+        {
+          "command": "pastepad.openPasteInBrowser",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "inline@4"
         }
       ],
       "editor/title": [
