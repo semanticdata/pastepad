@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - View paste in browser command (opens `https://{address}.paste.lol/{title}`)
 - Test suite covering paste commands
+- Right-click context menu for paste items in tree view
+- Localization support with `package.nls.json` for better maintainability
+- Spanish localization support with `package.nls.es.json`
+
+### Changed
+
+- Moved all user-facing strings to localization file per VS Code best practices
 
 ## [0.3.0] - 2026-01-03
 

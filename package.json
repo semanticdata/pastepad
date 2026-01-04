@@ -1,7 +1,7 @@
 {
   "name": "pastepad",
-  "displayName": "PastePad",
-  "description": "Access and manage your omg.lol pastebin from VS Code.",
+  "displayName": "%displayName%",
+  "description": "%description%",
   "version": "0.3.0",
   "publisher": "semanticdata",
   "repository": "https://github.com/semanticdata/pastepad",
@@ -33,72 +33,72 @@
     "commands": [
       {
         "command": "pastepad.authenticate",
-        "title": "Authenticate with omg.lol",
+        "title": "%commands.authenticate.title%",
         "icon": "$(key)"
       },
       {
         "command": "pastepad.refresh",
-        "title": "Refresh",
+        "title": "%commands.refresh.title%",
         "icon": "$(refresh)"
       },
       {
         "command": "pastepad.logout",
-        "title": "Logout",
+        "title": "%commands.logout.title%",
         "icon": "$(sign-out)"
       },
       {
         "command": "pastepad.openPaste",
-        "title": "Open Paste",
+        "title": "%commands.openPaste.title%",
         "icon": "$(file-text)"
       },
       {
         "command": "pastepad.newPaste",
-        "title": "New Paste",
+        "title": "%commands.newPaste.title%",
         "icon": "$(add)"
       },
       {
         "command": "pastepad.savePaste",
-        "title": "Save Paste",
+        "title": "%commands.savePaste.title%",
         "icon": "$(save)"
       },
       {
         "command": "pastepad.deletePaste",
-        "title": "Delete Paste",
+        "title": "%commands.deletePaste.title%",
         "icon": "$(trash)"
       },
       {
         "command": "pastepad.forceSync",
-        "title": "Force Sync Changes",
+        "title": "%commands.forceSync.title%",
         "icon": "$(sync)"
       },
       {
         "command": "pastepad.toggleVisibility",
-        "title": "Toggle Visibility",
+        "title": "%commands.toggleVisibility.title%",
         "icon": "$(eye)"
       },
       {
         "command": "pastepad.openPasteInBrowser",
-        "title": "View in Browser",
+        "title": "%commands.openPasteInBrowser.title%",
         "icon": "$(globe)"
       },
       {
         "command": "pastepad.togglePasteGrouping",
-        "title": "Toggle Paste Grouping by Visibility"
+        "title": "%commands.togglePasteGrouping.title%"
       },
       {
         "command": "pastepad.toggleDefaultListing",
-        "title": "Toggle Default Listing for New Pastes"
+        "title": "%commands.toggleDefaultListing.title%"
       },
       {
         "command": "pastepad.showPasteStats",
-        "title": "Show Paste Statistics"
+        "title": "%commands.showPasteStats.title%"
       }
     ],
     "views": {
       "pastepad": [
         {
           "id": "pastepad.pastebin",
-          "name": "Pastebin",
+          "name": "%views.pastepad.pastebin.name%",
           "when": "true"
         }
       ]
@@ -107,24 +107,24 @@
       "activitybar": [
         {
           "id": "pastepad",
-          "title": "PastePad",
+          "title": "%displayName%",
           "icon": "$(file-text)"
         }
       ]
     },
     "configuration": {
-      "title": "PastePad",
+      "title": "%configuration.title%",
       "properties": {
         "pastepad.logLevel": {
           "type": "string",
           "enum": ["debug", "info", "warn", "error"],
           "default": "info",
-          "description": "Controls the verbosity of logging in the Output panel",
+          "description": "%configuration.properties.logLevel.description%",
           "enumDescriptions": [
-            "Show all logs including detailed debugging information",
-            "Show informational logs and above",
-            "Show warnings and errors only",
-            "Show errors only"
+            "%configuration.properties.logLevel.enumDescriptions.debug%",
+            "%configuration.properties.logLevel.enumDescriptions.info%",
+            "%configuration.properties.logLevel.enumDescriptions.warn%",
+            "%configuration.properties.logLevel.enumDescriptions.error%"
           ]
         }
       }
