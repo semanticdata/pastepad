@@ -16,6 +16,29 @@ Contributions of all kinds are welcome.
 - Lint: `pnpm run lint`
 - Build: `pnpm run compile`
 
+## Testing
+
+Use `suiteSetup`/`suiteTeardown` for VS Code commands (can only be registered once), `setup`/`teardown` for other tests.
+
+```typescript
+suite('Feature Tests', () => {
+    let mockContext: any;
+
+    suiteSetup(async () => {
+        // One-time setup for the entire suite
+        mockContext = { /* mock extension context */ };
+    });
+
+    setup(() => {
+        // Reset state before each test
+    });
+
+    test('should do something', () => {
+        // Test implementation
+    });
+});
+```
+
 ## Logging
 
 Use `LoggerService` instead of `console.log()`:

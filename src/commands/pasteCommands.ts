@@ -376,6 +376,47 @@ export function registerPasteCommands(
         }
     });
 
+    // Open paste in browser command
+    const openPasteInBrowserCommand = vscode.commands.registerCommand('pastepad.openPasteInBrowser', async (item: any) => {
+        try {
+            const title = item?.pasteData?.title || item?.title;
+            if (!title) {
+                await errorHandler.handleError(
+                    errorHandler.createError(
+                        ErrorType.USER_INPUT,
+                        ErrorSeverity.LOW,
+                        'No paste title provided',
+                        'Unable to open paste in browser - no title specified'
+                    )
+                );
+                return;
+            }
+
+            const address = await authManager.getAddress();
+            if (!address) {
+                await errorHandler.handleError(
+                    errorHandler.createError(
+                        ErrorType.AUTHENTICATION,
+                        ErrorSeverity.MEDIUM,
+                        'Not authenticated',
+                        'Please authenticate first to view paste in browser'
+                    )
+                );
+                return;
+            }
+
+            // Construct the omg.lol pastebin URL
+            const url = `https://${address}.paste.lol/${title}`;
+            await vscode.env.openExternal(vscode.Uri.parse(url));
+
+        } catch (error) {
+            await errorHandler.handleError(error as Error, {
+                operation: 'openPasteInBrowser',
+                title: item?.pasteData?.title || item?.title
+            });
+        }
+    });
+
     // Force sync command
     const forceSyncCommand = vscode.commands.registerCommand('pastepad.forceSync', async () => {
         try {
@@ -445,6 +486,7 @@ export function registerPasteCommands(
         deletePasteCommand,
         savePasteCommand,
         toggleVisibilityCommand,
+        openPasteInBrowserCommand,
         forceSyncCommand
     );
 

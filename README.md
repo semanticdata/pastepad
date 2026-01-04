@@ -20,6 +20,7 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 - **Toggle visibility** to make pastes public (listed) or private (unlisted)
 - **Group pastes** by visibility status to keep things organized
 - **Force sync** with `Ctrl+Shift+S` when you need immediate control
+- **View in browser** to see your pastes live on paste.lol
 - **Syntax highlighting** detects the language from your paste title's file extension
 
 ## Requirements
@@ -30,7 +31,21 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 ## Installation
 
 > [!NOTE]
-> PastePad is not yet available in the VS Code Marketplace. To install it manually, follow these steps:
+> PastePad is not yet available in the VS Code Marketplace.
+
+### Install from VSIX (Recommended)
+
+1. Download the `.vsix` file from the [latest release](https://github.com/semanticdata/pastepad/releases/latest)
+2. Open VS Code
+3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) to open the Command Palette
+4. Type "Extensions: Install from VSIX..."
+5. Select the downloaded `.vsix` file
+6. Reload VS Code when prompted
+
+### Install from Source
+
+> [!TIP]
+> You can also install PastePad directly from source!
 
 1. Clone this repository: `git clone https://github.com/semanticdata/pastepad.git`
 2. Open the repository in VS Code
@@ -50,6 +65,7 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 
 - **New Paste** - Create a new paste (click the + icon in the tree view)
 - **Open Paste** - Open a paste for editing (click the paste title)
+- **View in Browser** - Open paste in default browser (click globe icon)
 - **Save Paste** - Save changes (`Ctrl+S` or click the save icon)
 - **Force Sync** - Manually sync changes (`Ctrl+Shift+S`)
 - **Toggle Visibility** - Switch a paste between listed/unlisted
