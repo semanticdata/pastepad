@@ -26,7 +26,13 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 ## Requirements
 
 - An [omg.lol](https://omg.lol/) account
-- Visual Studio Code version 1.104.0 or higher
+- Visual Studio Code version 1.84.0 or higher
+
+## Extension Settings
+
+- `pastepad.defaultListNewPastes`: Control whether new pastes are listed (public) or unlisted (private) by default
+- `pastepad.groupPastesByVisibility`: Group pastes by visibility status in the tree view
+- `pastepad.sortBy`: Sort pastes by 'modified', 'name', or 'created' date
 
 ## Installation
 
@@ -63,26 +69,31 @@ PastePad puts your omg.lol pastebin right in VS Code so you can work with code s
 
 ### Commands
 
-- **New Paste** - Create a new paste (click the + icon in the tree view)
-- **Open Paste** - Open a paste for editing (click the paste title)
-- **View in Browser** - Open paste in default browser (click globe icon)
-- **Save Paste** - Save changes (`Ctrl+S` or click the save icon)
-- **Force Sync** - Manually sync changes (`Ctrl+Shift+S`)
-- **Toggle Visibility** - Switch a paste between listed/unlisted
-- **Delete Paste** - Remove a paste
-- **Refresh** - Refresh the paste list
-- **Logout** - Sign out of your omg.lol account
+- `pastepad.newPaste` - Create a new paste
+- `pastepad.openPaste` - Open a paste for editing  
+- `pastepad.viewInBrowser` - Open paste in default browser
+- `pastepad.savePaste` - Save changes to current paste
+- `pastepad.forceSync` - Manually sync all changes
+- `pastepad.toggleVisibility` - Switch paste between listed/unlisted
+- `pastepad.deletePaste` - Remove a paste
+- `pastepad.refresh` - Refresh the paste list
+- `pastepad.authenticate` - Sign in to omg.lol account
+- `pastepad.logout` - Sign out of omg.lol account
 
 ### Keyboard Shortcuts
 
-| Command    | Shortcut       |
-| ---------- | -------------- |
-| Save Paste | `Ctrl+S`       |
-| Force Sync | `Ctrl+Shift+S` |
+- `Ctrl+S` - Save Paste
+- `Ctrl+Shift+S` - Force Sync
 
-## Notes
+## Feedback & Support
 
-This extension uses the undocumented `listed` attribute implementation from [omglolapi](https://github.com/rknightuk/omglolcli).
+- Report Issues: [GitHub Issues](https://github.com/semanticdata/pastepad/issues)
+- Feature Requests: [GitHub Discussions](https://github.com/semanticdata/pastepad/discussions)
+- Community: Join the [omg.lol Discord](https://discord.gg/omglol)
+
+## Acknowledgments
+
+Uses the undocumented `listed` attribute implementation from [omglolapi](https://github.com/rknightuk/omglolcli).
 
 Inspired by [GistPad](https://github.com/lostintangent/gistpad).
 
@@ -90,10 +101,6 @@ Inspired by [GistPad](https://github.com/lostintangent/gistpad).
 
 [MIT License](LICENSE)
 
-## Community & Support
+---
 
-PastePad is a free and open-source project built for the [omg.lol](https://omg.lol/) community. We believe in the power of collaboration and welcome contributions of all kinds. Whether you're a developer, a designer, or just an enthusiastic user, you can help shape the future of this extension.
-
-## Roadmap
-
-See [TODO.md](TODO.md) for planned features and pre-release tasks.
+**Made with ❤️ for the [omg.lol](https://omg.lol/) community**
