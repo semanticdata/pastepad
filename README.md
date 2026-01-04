@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> OAuth authentication is not yet available. PastePad currently supports API Key authentication only. Please use "Sign in with API Key" to authenticate.
+> OAuth authentication is not yet available. PastePad currently supports API Key authentication only.
 
 > [!WARNING]
 > PastePad is still in early development and may contain bugs or incomplete features. See the [TODO list](#todo).

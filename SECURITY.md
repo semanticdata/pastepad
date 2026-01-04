@@ -8,23 +8,39 @@ Email security issues to: [database@omg.lol](mailto:database@omg.lol)
 
 **Credentials**
 
-- Stored using VS Code's `secrets` API (never plain text)
-- Only sent to api.omg.lol via HTTPS
-- Never logged or included in error messages
+- Stored using VS Code's `secrets` API (encrypted at rest)
+- Only transmitted to api.omg.lol via HTTPS
+- Never included in error messages or user-visible output
+- Sensitive keys automatically redacted from logs: `password`, `token`, `secret`, `authorization`, `apikey`
 
 **Authentication**
 
-- OAuth uses `state` parameter to prevent CSRF
-- API key input is masked during entry
-- Both methods validate before storing
+- API key input is masked during entry (password field)
+- Credentials validated with omg.lol API before storage
+- OAuth infrastructure implemented but temporarily disabled (pending client_id/client_secret configuration)
+- OAuth uses `state` parameter to prevent CSRF when enabled
 
 **Your Pastes**
 
-- Not validated or modified
-- Only sent to omg.lol (no third parties)
-- Local cache uses VS Code's secure storage
+- Content never validated or modified by the extension
+- Only transmitted to omg.lol via HTTPS
+- Local cache uses VS Code's workspace state
+- Paste content is not logged
+
+**Network Security**
+
+- All API requests use HTTPS
+- TLS encryption enforced for all communication with api.omg.lol
+- No HTTP fallback
+
+**Logging & Error Handling**
+
+- Structured logging with configurable levels (debug, info, warn, error)
+- Default log level: info
+- Automatic redaction of sensitive data from metadata
+- Credentials never logged
 
 ## Known Issues
 
-- OAuth credentials are placeholders (API key auth works)
-- Debug logging present (will be removed before 1.0.0)
+- Console.error in error handler
+- OAuth client credentials are placeholders (OAuth flow not currently active)
