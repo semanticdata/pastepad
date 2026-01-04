@@ -172,6 +172,26 @@
           "command": "pastepad.openPasteInBrowser",
           "when": "view == pastepad.pastebin && viewItem == paste",
           "group": "inline@4"
+        },
+        {
+          "command": "pastepad.openPaste",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "basic@1"
+        },
+        {
+          "command": "pastepad.toggleVisibility",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "basic@2"
+        },
+        {
+          "command": "pastepad.openPasteInBrowser",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "basic@3"
+        },
+        {
+          "command": "pastepad.deletePaste",
+          "when": "view == pastepad.pastebin && viewItem == paste",
+          "group": "basic@4"
         }
       ],
       "editor/title": [
