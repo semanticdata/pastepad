@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed `workspaceState` mocking for synchronous state management
 - Removed boilerplate sample test
 - Added debug configuration for running tests with `--disable-extensions`
+- Temporarily disabled OAuth authentication; only API key authentication is currently available
+- OAuth infrastructure preserved in code for future enablement with client_id and client_secret
 
 ### Removed
 

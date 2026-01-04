@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { URLSearchParams } from 'url';
 import { StateManager, ErrorHandler, RetryManager, ErrorType, ErrorSeverity } from './services';
 
-// IMPORTANT: Replace with your actual client ID and secret
+// TODO: Configure OAuth credentials to enable OAuth authentication
+// These credentials will be needed when re-enabling OAuth flow
 const OAUTH_CLIENT_ID = 'YOUR_CLIENT_ID';
 const OAUTH_CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
 
@@ -41,22 +42,27 @@ export class AuthenticationManager {
     }
 
     async authenticate(): Promise<void> {
-        const selection = await vscode.window.showQuickPick([
-            { label: 'Sign in with OAuth', description: 'Recommended, most secure' },
-            { label: 'Sign in with API Key', description: 'Less secure' }
-        ]);
+        // TODO: Re-enable OAuth authentication once client_id and client_secret are configured
+        // const selection = await vscode.window.showQuickPick([
+        //     { label: 'Sign in with OAuth', description: 'Recommended, most secure' },
+        //     { label: 'Sign in with API Key', description: 'Less secure' }
+        // ]);
 
-        if (!selection) {
-            return;
-        }
+        // if (!selection) {
+        //     return;
+        // }
 
-        if (selection.label === 'Sign in with OAuth') {
-            await this.authenticateWithOAuth();
-        } else {
-            await this.authenticateWithApiKey();
-        }
+        // if (selection.label === 'Sign in with OAuth') {
+        //     await this.authenticateWithOAuth();
+        // } else {
+        //     await this.authenticateWithApiKey();
+        // }
+
+        // Temporarily only support API key authentication
+        await this.authenticateWithApiKey();
     }
 
+    // TODO: Uncomment this method when OAuth is ready to be enabled
     private async authenticateWithOAuth(): Promise<void> {
         try {
             const state = Date.now().toString();
@@ -150,6 +156,7 @@ export class AuthenticationManager {
         }
     }
 
+    // TODO: Uncomment this method when OAuth is ready to be enabled
     async handleAuthorizationCode(code: string, state: string): Promise<void> {
         try {
             const savedState = await this.stateManager.getOAuthState();
