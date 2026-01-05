@@ -6,7 +6,7 @@
   "publisher": "semanticdata",
   "repository": "https://github.com/semanticdata/pastepad",
   "engines": {
-    "vscode": "^1.107.1"
+    "vscode": "^1.84.0"
   },
   "categories": [
     "Snippets",
@@ -310,7 +310,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "24.7.2",
-    "@types/vscode": "^1.107.0",
+    "@types/vscode": "^1.84.0",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
     "@vscode/test-cli": "^0.0.12",

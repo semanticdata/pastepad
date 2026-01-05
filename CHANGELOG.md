@@ -54,6 +54,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Minimum VS Code version requirement reduced to 1.84.0 (from 1.107.1) for broader compatibility
+- Tests now run against VS Code 1.84.0 to ensure backward compatibility
 - Extension now activates on startup (`onStartupFinished`) instead of only when views are opened
 - Fixed profile API endpoint from `/address/{address}/profile` to `/address/{address}/web`
 - Fixed profile update API to include `publish: true` parameter
