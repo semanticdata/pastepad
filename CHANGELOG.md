@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Profile management support for omg.lol profiles and /now pages
+- Profile and /now page tree view in activity bar (separate from pastebin view)
+- Open profile command (`pastepad.openProfile`) to edit main profile
+- Open /now page command (`pastepad.openNowPage`) to edit /now page
+- Live preview panel for profiles and /now pages with markdown rendering
+- Profile preview toggle command (`pastepad.previewProfile`) with `Ctrl+Shift+V` shortcut
+- Publish profile command (`pastepad.publishProfile`) to force save changes
+- View profile in browser command (`pastepad.openProfileInBrowser`)
+- Profile picture upload command (`pastepad.uploadProfilePicture`) (UI ready, backend pending)
+- FileSystemProvider for `omgprofile:` and `omgnow:` schemes
+- Automatic 404 handling for profiles and /now pages that don't exist yet
+- Support for omg.lol profile placeholders (`{profile-picture}`, `{address}`, `{last-updated}`)
+- Profile theme and styling support in preview panel
+- Context values (`pastepad.isProfileDocument`, `pastepad.isNowPageDocument`) for UI conditionals
 - View paste in browser command (opens `https://{address}.paste.lol/{title}`)
 - Test suite covering paste commands
 - Right-click context menu for paste items in tree view
@@ -16,7 +30,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Extension now activates on startup (`onStartupFinished`) instead of only when views are opened
+- Fixed profile API endpoint from `/address/{address}/profile` to `/address/{address}/web`
+- Fixed profile update API to include `publish: true` parameter
+- Now page API uses correct `listed` parameter format (`'1'` or `'0'` as strings)
+- Improved error handling for missing profiles and /now pages
+- Profile and /now page commands no longer use i18n placeholders for immediate visibility
 - Moved all user-facing strings to localization file per VS Code best practices
+
+### Fixed
+
+- Profile and /now pages now load correctly (previously returned 404 errors)
+- Profile preview panel displays correctly with proper data extraction
+- Profile update requests now use the correct API endpoint
+- File system providers properly handle empty content for new profiles/now pages
 
 ## [0.3.0] - 2026-01-03
 

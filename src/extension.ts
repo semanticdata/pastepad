@@ -3,6 +3,10 @@ import { AuthenticationManager } from './authentication';
 import { OmgLolApi } from './api';
 import { PastebinProvider } from './pastebinProvider';
 import { PastepadFileSystemProvider } from './PastepadFileSystemProvider';
+import { ProfileProvider } from './profileProvider';
+import { ProfileFileSystemProvider } from './ProfileFileSystemProvider';
+import { NowFileSystemProvider } from './NowFileSystemProvider';
+import { ProfilePreviewPanel } from './panels/ProfilePreviewPanel';
 import { registerAllCommands, CommandDependencies } from './commands';
 import { initializeServices } from './services';
 
@@ -34,20 +38,36 @@ export function activate(context: vscode.ExtensionContext) {
     const uriHandler = new PastepadUriHandler(authManager);
     context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 
+    // Register file system providers
     const fileSystemProvider = new PastepadFileSystemProvider(api);
     context.subscriptions.push(vscode.workspace.registerFileSystemProvider('pastepad', fileSystemProvider, { isCaseSensitive: true }));
 
+    const profileFileSystemProvider = new ProfileFileSystemProvider(api);
+    context.subscriptions.push(vscode.workspace.registerFileSystemProvider('omgprofile', profileFileSystemProvider, { isCaseSensitive: true }));
+
+    const nowFileSystemProvider = new NowFileSystemProvider(api);
+    context.subscriptions.push(vscode.workspace.registerFileSystemProvider('omgnow', nowFileSystemProvider, { isCaseSensitive: true }));
+
+	// Create tree data providers
 	const pastebinProvider = new PastebinProvider(api, authManager);
+	const profileProvider = new ProfileProvider(authManager);
 
 	const pastebinView = vscode.window.createTreeView('pastepad.pastebin', {
 		treeDataProvider: pastebinProvider,
 		showCollapseAll: true
 	});
 
+	const profileView = vscode.window.createTreeView('pastepad.profiles', {
+		treeDataProvider: profileProvider,
+		showCollapseAll: true
+	});
+
 	// Register all commands using the modular structure
 	const commandDependencies: CommandDependencies = {
 		authManager,
-		pastebinProvider
+		pastebinProvider,
+		api,
+		profileProvider
 	};
 	const allCommands = registerAllCommands(context, commandDependencies);
 
@@ -58,7 +78,12 @@ export function activate(context: vscode.ExtensionContext) {
 	const updateDocumentContext = () => {
 		const activeEditor = vscode.window.activeTextEditor;
 		const isPasteDocument = activeEditor?.document.uri.scheme === 'pastepad';
+		const isProfileDocument = activeEditor?.document.uri.scheme === 'omgprofile';
+		const isNowPageDocument = activeEditor?.document.uri.scheme === 'omgnow';
+
 		vscode.commands.executeCommand('setContext', 'pastepad.isPasteDocument', isPasteDocument);
+		vscode.commands.executeCommand('setContext', 'pastepad.isProfileDocument', isProfileDocument);
+		vscode.commands.executeCommand('setContext', 'pastepad.isNowPageDocument', isNowPageDocument);
 
 		if (isPasteDocument) {
 			// Set initial unsynced changes state to false
@@ -69,16 +94,24 @@ export function activate(context: vscode.ExtensionContext) {
 	// Listen for active editor changes to update document context
 	const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor(updateDocumentContext);
 
-	// Listen for document changes to update unsynced changes context
-	const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument((e) => {
+	// Listen for document changes to update unsynced changes context and preview
+	const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument(async (e) => {
 		if (e.document.uri.scheme === 'pastepad') {
 			vscode.commands.executeCommand('setContext', 'pastepad.hasUnsyncedChanges', e.document.isDirty);
+		}
+
+		// Update preview for profile and now pages
+		if (e.document.uri.scheme === 'omgprofile' || e.document.uri.scheme === 'omgnow') {
+			if (ProfilePreviewPanel.currentPanel) {
+				ProfilePreviewPanel.currentPanel.updatePreview(e.document.getText());
+			}
 		}
 	});
 
 	authManager.onAuthenticationChanged(async () => {
 		updateContext();
 		await pastebinProvider.forceRefresh();
+		profileProvider.refresh();
 	});
 
 	// Initialize contexts
@@ -87,6 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		pastebinView,
+		profileView,
 		onDidChangeActiveTextEditor,
 		onDidChangeTextDocument,
 		...allCommands

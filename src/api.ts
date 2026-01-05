@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
-import { PasteItem } from './types';
+import { PasteItem, ProfileData, NowPageData } from './types';
 import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity, LoggerService } from './services';
 
 const API_URL = 'https://api.omg.lol';
@@ -13,6 +13,20 @@ interface GetPastesResponse {
 interface GetPasteResponse {
     request: { success: boolean };
     response: { paste?: PasteItem };
+}
+
+interface GetNowPageResponse {
+    request: { success: boolean };
+    response: {
+        now?: NowPageData;
+    };
+}
+
+interface UpdateNowPageResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+    };
 }
 
 export class OmgLolApi {
@@ -28,6 +42,10 @@ export class OmgLolApi {
         this.cacheManager = CacheManager.getInstance();
         this.stateManager = StateManager.getInstance();
         this.logger = LoggerService.getInstance();
+    }
+
+    getAuthorizationManager(): AuthenticationManager {
+        return this.authManager;
     }
 
     private async getHeaders(): Promise<{ [key: string]: string }> {
@@ -387,6 +405,250 @@ export class OmgLolApi {
             await this.errorHandler.handleError(error as Error, {
                 operation: 'deletePaste',
                 title
+            });
+            throw error;
+        }
+    }
+
+    // Profile and Now Page methods
+
+    async getProfile(address?: string, forceRefresh: boolean = false): Promise<ProfileData | undefined> {
+        try {
+            // Check cache first unless forcing refresh
+            if (!forceRefresh) {
+                const cached = await this.cacheManager.get<ProfileData>('profile');
+                if (cached) {
+                    return cached;
+                }
+            }
+
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Fetching profile', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/web`, {
+                    headers: await this.getHeaders()
+                });
+
+                // Return empty profile if not found (404)
+                if (response.status === 404) {
+                    this.logger.info('Profile not found, returning empty profile');
+                    return {
+                        success: true,
+                        result: {
+                            response: { content: '', type: 'profile', theme: 'default', css: '', head: '', verified: '0', pfp: '', metadata: '', branding: 'default' }
+                        }
+                    };
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json();
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to fetch profile');
+            }
+
+            const apiResponse = result.result as any;
+            const profile: ProfileData = {
+                content: apiResponse.response?.content || '',
+                theme: apiResponse.response?.theme,
+                css: apiResponse.response?.css,
+                head: apiResponse.response?.head,
+                verified: apiResponse.response?.verified,
+                pfp: apiResponse.response?.pfp,
+                metadata: apiResponse.response?.metadata,
+                branding: apiResponse.response?.branding,
+                type: apiResponse.response?.type
+            };
+
+            // Cache the result with 5 minute TTL (300 seconds)
+            await this.cacheManager.set('profile', profile, { ttl: 300 });
+
+            return profile;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getProfile',
+                address,
+                forceRefresh
+            });
+
+            // Try to return cached data as last resort
+            const fallback = await this.cacheManager.getOfflineData<ProfileData>('profile');
+            return fallback;
+        }
+    }
+
+    async updateProfile(content: string, address?: string): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Updating profile', { address: targetAddress, contentLength: content.length });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/web`, {
+                    method: 'POST',
+                    headers: await this.getHeaders(),
+                    body: JSON.stringify({ content, publish: true })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json();
+            });
+
+            if (!result.success) {
+                throw result.error || new Error('Failed to update profile');
+            }
+
+            // Invalidate cache
+            await this.cacheManager.invalidate('profile');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'updateProfile',
+                address,
+                contentLength: content.length
+            });
+            throw error;
+        }
+    }
+
+    async getNowPage(address?: string, forceRefresh: boolean = false): Promise<NowPageData | undefined> {
+        try {
+            // Check cache first unless forcing refresh
+            if (!forceRefresh) {
+                const cached = await this.cacheManager.get<NowPageData>('now');
+                if (cached) {
+                    return cached;
+                }
+            }
+
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Fetching now page', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/now`);
+
+                // Return empty now page if not found (404)
+                if (response.status === 404) {
+                    this.logger.info('Now page not found, returning empty now page');
+                    return {
+                        success: true,
+                        result: {
+                            response: { now: { content: '', updated: '', listed: '0' } }
+                        }
+                    };
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetNowPageResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to fetch now page');
+            }
+
+            const nowPage = (result.result as any).response.now;
+
+            // Cache the result with 5 minute TTL
+            if (nowPage) {
+                await this.cacheManager.set('now', nowPage, { ttl: 300 });
+            }
+
+            return nowPage;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getNowPage',
+                address,
+                forceRefresh
+            });
+
+            // Try to return cached data as last resort
+            const fallback = await this.cacheManager.getOfflineData<NowPageData>('now');
+            return fallback;
+        }
+    }
+
+    async updateNowPage(content: string, listed: boolean = true, address?: string): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Updating now page', { address: targetAddress, contentLength: content.length, listed });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const requestBody: any = { content, listed: listed ? '1' : '0' };
+
+                const response = await fetch(`${API_URL}/address/${targetAddress}/now`, {
+                    method: 'POST',
+                    headers: await this.getHeaders(),
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<UpdateNowPageResponse>;
+            });
+
+            if (!result.success) {
+                throw result.error || new Error('Failed to update now page');
+            }
+
+            // Invalidate cache
+            await this.cacheManager.invalidate('now');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'updateNowPage',
+                address,
+                contentLength: content.length,
+                listed
             });
             throw error;
         }
