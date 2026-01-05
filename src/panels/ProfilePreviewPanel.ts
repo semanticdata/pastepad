@@ -15,18 +15,30 @@ export class ProfilePreviewPanel {
     public static async createOrShow(
         extensionUri: vscode.Uri,
         documentUri: vscode.Uri,
-        api: OmgLolApi
+        api: OmgLolApi,
+        viewColumn?: vscode.ViewColumn,
+        takeFocus: boolean = true
     ): Promise<ProfilePreviewPanel> {
         const logger = LoggerService.getInstance();
-        logger.info('Creating profile preview panel', { documentUri: documentUri.toString() });
+        logger.info('Creating profile preview panel', { documentUri: documentUri.toString(), takeFocus });
 
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
+        // Determine the column to use
+        let targetColumn = viewColumn;
+        if (!targetColumn) {
+            // If no column specified, put it beside the active editor
+            const activeColumn = vscode.window.activeTextEditor?.viewColumn;
+            if (activeColumn === vscode.ViewColumn.One) {
+                targetColumn = vscode.ViewColumn.Two;
+            } else if (activeColumn === vscode.ViewColumn.Two) {
+                targetColumn = vscode.ViewColumn.Three;
+            } else {
+                targetColumn = vscode.ViewColumn.Beside;
+            }
+        }
 
         // If we already have a panel, show it
         if (ProfilePreviewPanel.currentPanel) {
-            ProfilePreviewPanel.currentPanel.panel.reveal(column);
+            ProfilePreviewPanel.currentPanel.panel.reveal(targetColumn, takeFocus);
             return ProfilePreviewPanel.currentPanel;
         }
 
@@ -34,7 +46,7 @@ export class ProfilePreviewPanel {
         const panel = vscode.window.createWebviewPanel(
             'omgProfilePreview',
             'Profile Preview',
-            column || vscode.ViewColumn.Beside,
+            { viewColumn: targetColumn, preserveFocus: !takeFocus },
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,

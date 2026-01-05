@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Profile preview panel displays correctly with proper data extraction
 - Profile update requests now use the correct API endpoint
 - File system providers properly handle empty content for new profiles/now pages
+- Profile and /now page preview now reliably opens in split view using `ViewColumn.Beside`
+- Preview panel placement is now dynamic and works correctly regardless of active editor column
+- Editor opens first in active column, establishing anchor for preview to appear beside it
+- Preview preserves focus in editor using `takeFocus: false` parameter
 
 ## [0.3.0] - 2026-01-03
 

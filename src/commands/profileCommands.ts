@@ -19,11 +19,23 @@ export function registerProfileCommands(
             try {
                 logger.info('Opening profile document');
                 const uri = vscode.Uri.parse('omgprofile:///profile.md');
-                const doc = await vscode.workspace.openTextDocument(uri);
-                await vscode.window.showTextDocument(doc, { preview: false });
 
-                // Automatically show preview
-                await ProfilePreviewPanel.createOrShow(context.extensionUri, uri, api);
+                // 1. Open the editor FIRST (in active column)
+                // This establishes the "anchor" for the preview to be beside.
+                const doc = await vscode.workspace.openTextDocument(uri);
+                await vscode.window.showTextDocument(doc, {
+                    preview: false,
+                    viewColumn: vscode.ViewColumn.Active
+                });
+
+                // 2. Open the preview BESIDE the editor
+                await ProfilePreviewPanel.createOrShow(
+                    context.extensionUri,
+                    uri,
+                    api,
+                    vscode.ViewColumn.Beside, // Dynamic split
+                    false // Preserve focus in the editor
+                );
             } catch (error) {
                 logger.error('Failed to open profile', { error });
                 vscode.window.showErrorMessage(`Failed to open profile: ${error}`);
@@ -39,11 +51,23 @@ export function registerProfileCommands(
             try {
                 logger.info('Opening /now page document');
                 const uri = vscode.Uri.parse('omgnow:///now.md');
-                const doc = await vscode.workspace.openTextDocument(uri);
-                await vscode.window.showTextDocument(doc, { preview: false });
 
-                // Automatically show preview
-                await ProfilePreviewPanel.createOrShow(context.extensionUri, uri, api);
+                // 1. Open the editor FIRST (in active column)
+                // This establishes the "anchor" for the preview to be beside.
+                const doc = await vscode.workspace.openTextDocument(uri);
+                await vscode.window.showTextDocument(doc, {
+                    preview: false,
+                    viewColumn: vscode.ViewColumn.Active
+                });
+
+                // 2. Open the preview BESIDE the editor
+                await ProfilePreviewPanel.createOrShow(
+                    context.extensionUri,
+                    uri,
+                    api,
+                    vscode.ViewColumn.Beside, // Dynamic split
+                    false // Preserve focus in the editor
+                );
             } catch (error) {
                 logger.error('Failed to open /now page', { error });
                 vscode.window.showErrorMessage(`Failed to open /now page: ${error}`);
