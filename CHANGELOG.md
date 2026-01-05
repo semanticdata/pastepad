@@ -16,7 +16,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Profile preview toggle command (`pastepad.previewProfile`) with `Ctrl+Shift+V` shortcut
 - Publish profile command (`pastepad.publishProfile`) to force save changes
 - View profile in browser command (`pastepad.openProfileInBrowser`)
-- Profile picture upload command (`pastepad.uploadProfilePicture`) (UI ready, backend pending)
+- Profile picture upload functionality (`pastepad.uploadProfilePicture`) with full multipart/form-data support
+- Support for PNG, JPG, GIF, WebP, SVG image formats for profile pictures
+- File size validation (5MB limit) for profile picture uploads
+- Progress indicators during profile picture upload
+- Complete weblog API implementation (9 endpoints) for future weblog features
+- Weblog entry management: list, get, create, delete, and latest post retrieval
+- Weblog configuration management: get and update weblog settings
+- Weblog template management: get and update custom HTML templates
+- some.pics API discovery documentation for future picture sharing features
 - FileSystemProvider for `omgprofile:` and `omgnow:` schemes
 - Automatic 404 handling for profiles and /now pages that don't exist yet
 - Support for omg.lol profile placeholders (`{profile-picture}`, `{address}`, `{last-updated}`)
@@ -27,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Right-click context menu for paste items in tree view
 - Localization support with `package.nls.json` for better maintainability
 - Spanish localization support with `package.nls.es.json`
+- TypeScript interfaces for WeblogEntry, WeblogConfiguration, and WeblogTemplate
 
 ### Changed
 
@@ -37,6 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Improved error handling for missing profiles and /now pages
 - Profile and /now page commands no longer use i18n placeholders for immediate visibility
 - Moved all user-facing strings to localization file per VS Code best practices
+- Improved profile cache invalidation after picture upload
+- Enhanced error handling for file operations with user-friendly messages
 
 ### Fixed
 
@@ -48,6 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Preview panel placement is now dynamic and works correctly regardless of active editor column
 - Editor opens first in active column, establishing anchor for preview to appear beside it
 - Preview preserves focus in editor using `takeFocus: false` parameter
+- Completed stubbed profile picture upload command with full implementation
 
 ## [0.3.0] - 2026-01-03
 

@@ -182,12 +182,37 @@ export function registerProfileCommands(
                     canSelectFolders: false,
                     canSelectMany: false,
                     filters: {
-                        'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp']
-                    }
+                        'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+                        'All Files': ['*']
+                    },
+                    title: 'Select a profile picture'
                 });
 
                 if (!fileUri || fileUri.length === 0) {
+                    logger.debug('User cancelled profile picture upload');
                     return;
+                }
+
+                const selectedFile = fileUri[0];
+
+                // Handle different file schemes
+                let filePath: string;
+                if (selectedFile.scheme === 'file') {
+                    filePath = selectedFile.fsPath;
+                } else {
+                    // For non-file schemes, read the content and save to temp file
+                    const fileContent = await vscode.workspace.fs.readFile(selectedFile);
+                    const os = require('os');
+                    const path = require('path');
+                    const fs = require('fs').promises;
+
+                    const tempDir = os.tmpdir();
+                    const fileExtension = path.extname(selectedFile.path);
+                    const tempFileName = `vscode-pfp-${Date.now()}${fileExtension}`;
+                    filePath = path.join(tempDir, tempFileName);
+
+                    await fs.writeFile(filePath, Buffer.from(fileContent));
+                    logger.info('Saved non-file scheme file to temp', { filePath });
                 }
 
                 const address = await api.getAuthorizationManager().getAddress();
@@ -196,15 +221,31 @@ export function registerProfileCommands(
                     return;
                 }
 
-                vscode.window.showInformationMessage('Uploading profile picture...');
+                // Show progress indicator during upload
+                await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: 'Uploading profile picture...',
+                        cancellable: false
+                    },
+                    async () => {
+                        const result = await api.uploadProfilePicture(filePath);
+                        logger.info('Profile picture uploaded successfully', { result });
 
-                // TODO: Implement actual upload API call
-                // For now, just show a message that this feature is coming soon
-                vscode.window.showInformationMessage('Profile picture upload will be implemented in a future update!');
-                logger.info('Profile picture upload requested', { fileUri: fileUri[0].toString() });
+                        // Show success message with action button
+                        vscode.window.showInformationMessage(
+                            `Profile picture uploaded: ${result}`,
+                            'View Profile'
+                        ).then(selection => {
+                            if (selection === 'View Profile') {
+                                vscode.commands.executeCommand('pastepad.openProfileInBrowser');
+                            }
+                        });
+                    }
+                );
             } catch (error) {
                 logger.error('Failed to upload profile picture', { error });
-                vscode.window.showErrorMessage(`Failed to upload profile picture: ${error}`);
+                // Error is already handled by the API layer's error handler
             }
         }
     );

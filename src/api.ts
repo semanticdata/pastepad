@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
-import { PasteItem, ProfileData, NowPageData } from './types';
+import { PasteItem, ProfileData, NowPageData, WeblogEntry, WeblogConfiguration, WeblogTemplate } from './types';
 import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity, LoggerService } from './services';
 
 const API_URL = 'https://api.omg.lol';
@@ -28,6 +28,74 @@ interface UpdateNowPageResponse {
         message?: string;
     };
 }
+
+interface UploadProfilePictureResponse {
+    request: { success: boolean; status_code: number };
+    response: { message: string };
+}
+
+// Weblog response interfaces
+interface GetWeblogEntriesResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+        entries?: WeblogEntry[];
+    };
+}
+
+interface GetWeblogEntryResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+        entry?: WeblogEntry;
+    };
+}
+
+interface CreateWeblogEntryResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+        entry?: WeblogEntry;
+    };
+}
+
+interface DeleteWeblogEntryResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+    };
+}
+
+interface GetWeblogConfigurationResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+        configuration?: WeblogConfiguration;
+    };
+}
+
+interface UpdateWeblogConfigurationResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+    };
+}
+
+interface GetWeblogTemplateResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+        template?: string;
+    };
+}
+
+interface UpdateWeblogTemplateResponse {
+    request: { success: boolean };
+    response: {
+        message?: string;
+    };
+}
+
 
 export class OmgLolApi {
     private errorHandler: ErrorHandler;
@@ -649,6 +717,588 @@ export class OmgLolApi {
                 address,
                 contentLength: content.length,
                 listed
+            });
+            throw error;
+        }
+    }
+
+    async uploadProfilePicture(filePath: string, address?: string): Promise<string> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Uploading profile picture', {
+                address: targetAddress,
+                filePath
+            });
+
+            // Read file and validate
+            const fs = require('fs').promises;
+            const path = require('path');
+
+            const fileStats = await fs.stat(filePath);
+
+            // Validate file size (max 5MB)
+            const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+            if (fileStats.size > MAX_FILE_SIZE) {
+                throw this.errorHandler.createError(
+                    ErrorType.USER_INPUT,
+                    ErrorSeverity.MEDIUM,
+                    'File too large',
+                    'Profile picture must be under 5MB. Please choose a smaller file.',
+                    {
+                        suggestedActions: ['Compress the image', 'Choose a different file']
+                    }
+                );
+            }
+
+            // Validate file type
+            const validExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+            const fileExtension = path.extname(filePath).toLowerCase();
+            if (!validExtensions.includes(fileExtension)) {
+                throw this.errorHandler.createError(
+                    ErrorType.USER_INPUT,
+                    ErrorSeverity.MEDIUM,
+                    'Invalid file type',
+                    'Profile picture must be PNG, JPG, GIF, WebP, or SVG.',
+                    {
+                        suggestedActions: ['Convert image to valid format', 'Choose a different file']
+                    }
+                );
+            }
+
+            // Read file content
+            const fileBuffer = await fs.readFile(filePath);
+            const fileName = path.basename(filePath);
+            const contentType = this.getContentType(fileExtension);
+
+            // Create multipart/form-data body
+            const boundary = `----ProfilePictureBoundary${Date.now()}`;
+            const formData = this.createMultipartFormData(boundary, fileName, contentType, fileBuffer);
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/pfp`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`,
+                        'Content-Type': `multipart/form-data; boundary=${boundary}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                }
+
+                return response.json() as Promise<UploadProfilePictureResponse>;
+            });
+
+            if (!result.request.success) {
+                throw new Error(result.response.message || 'Failed to upload profile picture');
+            }
+
+            const message = result.response.message;
+            this.logger.info('Profile picture uploaded successfully', { message });
+
+            // Invalidate profile cache to force refresh
+            await this.cacheManager.invalidate('profile');
+
+            return message;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'uploadProfilePicture',
+                address,
+                filePath
+            });
+            throw error;
+        }
+    }
+
+    private getContentType(extension: string): string {
+        const contentTypes: Record<string, string> = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.svg': 'image/svg+xml'
+        };
+        return contentTypes[extension] || 'application/octet-stream';
+    }
+
+    private createMultipartFormData(boundary: string, fileName: string, contentType: string, fileBuffer: Buffer): string {
+        const header = [
+            `--${boundary}`,
+            `Content-Disposition: form-data; name="file"; filename="${fileName}"`,
+            `Content-Type: ${contentType}`,
+            '',
+            ''
+        ].join('\r\n');
+
+        const footer = `\r\n--${boundary}--\r\n`;
+
+        // For binary data, we need to use Buffer.concat
+        const headerBuffer = Buffer.from(header, 'utf8');
+        const footerBuffer = Buffer.from(footer, 'utf8');
+
+        return Buffer.concat([headerBuffer, fileBuffer, footerBuffer]).toString('binary');
+    }
+
+    // ============ WEBLOG METHODS ============
+
+    /**
+     * Retrieve all weblog entries
+     */
+    async getWeblogEntries(address?: string): Promise<WeblogEntry[]> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Retrieving weblog entries', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/entries`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetWeblogEntriesResponse>;
+            });
+
+            if (!result.request.success || !result.response.entries) {
+                return [];
+            }
+
+            this.logger.info('Weblog entries retrieved successfully', {
+                count: result.response.entries.length
+            });
+
+            return result.response.entries;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getWeblogEntries',
+                address
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve a single weblog entry
+     */
+    async getWeblogEntry(entryId: string, address?: string): Promise<WeblogEntry> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Retrieving weblog entry', { address: targetAddress, entryId });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/entry/${entryId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetWeblogEntryResponse>;
+            });
+
+            if (!result.request.success || !result.response.entry) {
+                throw new Error('Failed to retrieve weblog entry');
+            }
+
+            this.logger.info('Weblog entry retrieved successfully', { entryId });
+
+            return result.response.entry;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getWeblogEntry',
+                address,
+                entryId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve the latest weblog post (no auth required)
+     */
+    async getLatestWeblogPost(address: string): Promise<WeblogEntry | null> {
+        try {
+            this.logger.info('Retrieving latest weblog post', { address });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${address}/weblog/post/latest`, {
+                    method: 'GET'
+                    // No auth required
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetWeblogEntryResponse>;
+            });
+
+            if (!result.request.success || !result.response.entry) {
+                return null;
+            }
+
+            this.logger.info('Latest weblog post retrieved successfully');
+
+            return result.response.entry;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getLatestWeblogPost',
+                address
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Create a new weblog entry
+     */
+    async createWeblogEntry(entryId: string, content: string, address?: string): Promise<WeblogEntry> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Creating weblog entry', { address: targetAddress, entryId });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/entry/${entryId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`,
+                        'Content-Type': 'text/plain'
+                    },
+                    body: content
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<CreateWeblogEntryResponse>;
+            });
+
+            if (!result.request.success || !result.response.entry) {
+                throw new Error(result.response.message || 'Failed to create weblog entry');
+            }
+
+            this.logger.info('Weblog entry created successfully', { entryId });
+
+            // Invalidate weblog cache
+            await this.cacheManager.invalidate('weblog');
+
+            return result.response.entry;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'createWeblogEntry',
+                address,
+                entryId,
+                contentLength: content.length
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a weblog entry
+     */
+    async deleteWeblogEntry(entryId: string, address?: string): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Deleting weblog entry', { address: targetAddress, entryId });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/delete/${entryId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<DeleteWeblogEntryResponse>;
+            });
+
+            if (!result.request.success) {
+                throw new Error(result.response.message || 'Failed to delete weblog entry');
+            }
+
+            this.logger.info('Weblog entry deleted successfully', { entryId });
+
+            // Invalidate weblog cache
+            await this.cacheManager.invalidate('weblog');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'deleteWeblogEntry',
+                address,
+                entryId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve weblog configuration
+     */
+    async getWeblogConfiguration(address?: string): Promise<WeblogConfiguration> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Retrieving weblog configuration', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/configuration`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetWeblogConfigurationResponse>;
+            });
+
+            if (!result.request.success || !result.response.configuration) {
+                throw new Error('Failed to retrieve weblog configuration');
+            }
+
+            this.logger.info('Weblog configuration retrieved successfully');
+
+            return result.response.configuration;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getWeblogConfiguration',
+                address
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Update weblog configuration
+     */
+    async updateWeblogConfiguration(configuration: string, address?: string): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Updating weblog configuration', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/configuration`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`,
+                        'Content-Type': 'text/plain'
+                    },
+                    body: configuration
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<UpdateWeblogConfigurationResponse>;
+            });
+
+            if (!result.request.success) {
+                throw new Error(result.response.message || 'Failed to update weblog configuration');
+            }
+
+            this.logger.info('Weblog configuration updated successfully');
+
+            // Invalidate weblog cache
+            await this.cacheManager.invalidate('weblog');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'updateWeblogConfiguration',
+                address,
+                configurationLength: configuration.length
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve weblog template
+     */
+    async getWeblogTemplate(address?: string): Promise<string> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Retrieving weblog template', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/template`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<GetWeblogTemplateResponse>;
+            });
+
+            if (!result.request.success || !result.response.template) {
+                throw new Error('Failed to retrieve weblog template');
+            }
+
+            this.logger.info('Weblog template retrieved successfully');
+
+            return result.response.template;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getWeblogTemplate',
+                address
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Update weblog template
+     */
+    async updateWeblogTemplate(template: string, address?: string): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Updating weblog template', { address: targetAddress });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/weblog/template`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${await this.authManager.getAccessToken()}`,
+                        'Content-Type': 'text/html'
+                    },
+                    body: template
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<UpdateWeblogTemplateResponse>;
+            });
+
+            if (!result.request.success) {
+                throw new Error(result.response.message || 'Failed to update weblog template');
+            }
+
+            this.logger.info('Weblog template updated successfully');
+
+            // Invalidate weblog cache
+            await this.cacheManager.invalidate('weblog');
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'updateWeblogTemplate',
+                address,
+                templateLength: template.length
             });
             throw error;
         }

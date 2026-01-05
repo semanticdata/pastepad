@@ -28,6 +28,7 @@
 - [ ] Lower minimum version if compatible
 - [ ] Test full authentication flow
 - [ ] Test all profile & /now page features
+- [ ] Test profile picture upload
 
 ### Release Tasks
 
