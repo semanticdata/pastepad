@@ -1,66 +1,93 @@
 # TODO
 
-Some items in the checklist are being considered and not necessarily planned. I haven't separated them yet. I'm focusing on the initial marketplace release to allow for even easier testing and feedback from others.
+## 1.0.0 Release Checklist
 
-## Pre-Release Checklist
+### Assets
 
-- [ ] Set up OAuth application with omg.lol and configure credentials in `authentication.ts`
-- [ ] Update version to 1.0.0
-- [ ] Create extension icons
-- [ ] Take screenshots for marketplace
-- [ ] Lower VS Code minimum version for compatibility
-- [ ] Test on different VS Code versions
-- [ ] Submit to VS Code Marketplace
-- [ ] Consider migrating source code to [SourceTube](https://source.tube/)
+- [ ] Extension icon (128x128px PNG) - marketplace listing, activity bar
+- [ ] Marketplace screenshots:
+  - [ ] Paste tree view with context menu
+  - [ ] Profile editor with preview panel
+  - [ ] Settings/configuration
+  - [ ] Example paste being edited
+- [ ] Short GIF/demo (as hero?)
 
-## Feature Enhancements
+### Documentation
+
+- [ ] Update README.md:
+  - [ ] Add Profile & /now page sections
+  - [ ] Document all config properties (logLevel, profile.autoSync, profile.previewOnOpen)
+  - [ ] Add screenshots
+- [ ] Complete Spanish localization `package.nls.es.json`
+- [ ] Create marketplace listing description
+
+### Testing
+
+- [ ] Test on VS Code 1.107.1 (consider lowering minimum)
+- [ ] Test on latest stable VS Code
+- [ ] Lower minimum version if compatible
+- [ ] Test full authentication flow
+- [ ] Test all profile & /now page features
+
+### Release Tasks
+
+- [ ] Verify .vscodeignore excludes dev files only
+- [ ] Test installed VSIX before submission
+- [ ] Submit to marketplace
+
+### Post-Release (Optional)
+
+- [ ] Apply for featured badge
+- [ ] Announce on omg.lol Discourse
+- [ ] Consider SourceTube migration
+
+---
+
+## Post-1.0.0 - Backlog of Ideas
+
+### UX Polish
+
+- Copy URL to clipboard command
+- Progress indicators for long operations
+- Notification actions (View in Browser, Copy URL after save)
+- Input validation for paste titles (prevent duplicates)
 
 ### Status Bar
 
-- [ ] Show connection status indicator
-- [ ] Display paste count
-- [ ] Quick access to refresh command
-
-### UX Improvements
-
-- [ ] Add copy URL to clipboard command
-- [ ] Quick pick for fast paste switching (`Ctrl+P` style)
-- [ ] Progress indicators for long operations
-- [ ] Notification actions (View in Browser, Copy URL after save)
-- [ ] Input validation for paste titles (prevent duplicates)
+- Connection status indicator
+- Paste count display
+- Quick refresh button
 
 ### Search & Organization
 
-- [ ] Search/filter pastes in tree view
-- [ ] Mark pastes as favorites (pin to top)
-- [ ] Batch operations (multi-select for delete, visibility change)
+- Search/filter/sort pastes in tree view
+- Favorites (pin to top)
 
 ### Editor Integration
 
-- [ ] Code lenses showing paste metadata in editor
-- [ ] Text decorations for visibility status (already have tree view icon)
-- [ ] Webview panel for markdown preview
-- [ ] Completion provider for paste references (`@@` trigger)
+- Code lenses for paste metadata
+- Text decorations for visibility status
+- Completion provider for paste references (`@@` trigger)
 
 ### Power Features
 
-- [ ] Diff view for local vs remote changes
-- [ ] Export pastes as VS Code snippets
-- [ ] Paste statistics dashboard
-- [ ] Drag-drop files to create pastes
+- Diff view (local vs remote)
+- Export as VS Code snippets
+- Drag-drop files to create pastes
+- Drag-drop images to upload to `some.pics`
+- Paste statistics dashboard
 
-## Technical Debt
+### Technical Debt
 
-- [ ] Add error boundary handling
-- [ ] Implement retry logic for failed API calls
-- [ ] Research VS Code telemetry for usage analytics (and how to improve without it)
-- [ ] Performance optimization for large paste collections
-- [ ] Unit test coverage for core modules
-- [ ] Integration tests for API calls
+- Error boundary handling
+- Performance optimization for large collections
+- Unit test coverage expansion
+- Integration tests for API calls
+- Architecture diagrams (mermaid - I do love me a good diagram)
 
-## Documentation
+### Future Enhancements
 
-- [x] Create CONTRIBUTING.md with contribution guidelines
-- [x] Create SECURITY.md with vulnerability reporting
-- [ ] Add architecture diagrams (love me a good mermaid diagram)
-- [ ] Write API documentation for omg.lol integration
+- OAuth authentication (requires omg.lol app setup)
+- Webview markdown preview for pastes similar to profile and now pages
+- Quick pick paste switching (Ctrl+P style)
+- Telemetry for usage analytics (privacy-respecting if needed)
