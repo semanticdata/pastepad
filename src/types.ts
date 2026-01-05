@@ -72,3 +72,50 @@ export interface WeblogConfiguration {
 export interface WeblogTemplate {
 	template: string;
 }
+
+// some.pics types
+export interface SomePicsUploadResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		message: string;
+		id: string;
+		url: string;
+	};
+}
+
+export interface SomePicsUpdateResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		message: string;
+	};
+}
+
+export interface SomePicsMetadata {
+	id: string;
+	address: string;
+	url: string;
+	created: string; // Unix timestamp
+	mime: string;
+	alt_text?: string;
+	description?: string;
+	width?: number;
+	height?: number;
+	size?: number;
+}
+
+export interface SomePicsGetResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		message?: string;
+		pic?: SomePicsMetadata;
+	};
+}

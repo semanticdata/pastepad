@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
-import { PasteItem, ProfileData, NowPageData, WeblogEntry, WeblogConfiguration, WeblogTemplate } from './types';
+import { PasteItem, ProfileData, NowPageData, WeblogEntry, WeblogConfiguration, WeblogTemplate, SomePicsUploadResponse, SomePicsUpdateResponse, SomePicsGetResponse, SomePicsMetadata } from './types';
 import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity, LoggerService } from './services';
 
 const API_URL = 'https://api.omg.lol';
@@ -1345,6 +1345,252 @@ export class OmgLolApi {
                 operation: 'updateWeblogTemplate',
                 address,
                 templateLength: template.length
+            });
+            throw error;
+        }
+    }
+
+    // ============ SOME.PICS METHODS ============
+
+    /**
+     * Upload an image to some.pics
+     * @param filePath Local path to the image file
+     * @param tags Optional comma-separated tags
+     * @param address Optional omg.lol address (defaults to authenticated address)
+     * @returns Object containing image ID and URL
+     */
+    async uploadToSomePics(filePath: string, tags?: string, address?: string): Promise<{ id: string; url: string }> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Uploading image to some.pics', {
+                address: targetAddress,
+                filePath,
+                tags
+            });
+
+            // Read file and validate
+            const fs = require('fs').promises;
+            const path = require('path');
+
+            const fileStats = await fs.stat(filePath);
+
+            // Validate file size (max 5MB - safe limit for undoc API)
+            const MAX_FILE_SIZE = 5 * 1024 * 1024;
+            if (fileStats.size > MAX_FILE_SIZE) {
+                throw this.errorHandler.createError(
+                    ErrorType.USER_INPUT,
+                    ErrorSeverity.MEDIUM,
+                    'File too large',
+                    'Image must be under 5MB.',
+                    {
+                        suggestedActions: ['Compress the image', 'Choose a different file']
+                    }
+                );
+            }
+
+            // Validate file type
+            const validExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+            const fileExtension = path.extname(filePath).toLowerCase();
+            if (!validExtensions.includes(fileExtension)) {
+                throw this.errorHandler.createError(
+                    ErrorType.USER_INPUT,
+                    ErrorSeverity.MEDIUM,
+                    'Invalid file type',
+                    'Image must be PNG, JPG, GIF, or WebP.',
+                    {
+                        suggestedActions: ['Convert image to valid format', 'Choose a different file']
+                    }
+                );
+            }
+
+            // Read file and convert to Base64
+            const fileBuffer = await fs.readFile(filePath);
+            const base64String = fileBuffer.toString('base64');
+
+            // Prepare JSON payload (CRITICAL: not multipart/form-data)
+            const payload: any = {
+                pic: base64String
+            };
+            if (tags) {
+                payload.tags = tags;
+            }
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/pics/upload`, {
+                    method: 'POST',
+                    headers: await this.getHeaders(), // Returns JSON headers
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                }
+
+                return response.json() as Promise<SomePicsUploadResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to upload image');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.id || !apiResponse.response.url) {
+                throw new Error(apiResponse.response.message || 'Failed to upload image');
+            }
+
+            this.logger.info('Image uploaded successfully', {
+                id: apiResponse.response.id,
+                url: apiResponse.response.url
+            });
+
+            return {
+                id: apiResponse.response.id,
+                url: apiResponse.response.url
+            };
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'uploadToSomePics',
+                address,
+                filePath
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Update metadata for an uploaded image
+     * @param imageId The ID of the uploaded image
+     * @param metadata Metadata to update (alt_text, description, tags, hide_from_public)
+     * @param address Optional omg.lol address (defaults to authenticated address)
+     */
+    async updateSomePicsMetadata(
+        imageId: string,
+        metadata: {
+            description?: string;
+            alt_text?: string;
+            tags?: string;
+            hide_from_public?: boolean;
+        },
+        address?: string
+    ): Promise<void> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Updating some.pics image metadata', {
+                address: targetAddress,
+                imageId,
+                metadata
+            });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/pics/${imageId}`, {
+                    method: 'PUT',
+                    headers: await this.getHeaders(),
+                    body: JSON.stringify(metadata)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                }
+
+                return response.json() as Promise<SomePicsUpdateResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to update image metadata');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success) {
+                throw new Error(apiResponse.response.message || 'Failed to update image metadata');
+            }
+
+            this.logger.info('Image metadata updated successfully', { imageId });
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'updateSomePicsMetadata',
+                address,
+                imageId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve details for a specific image
+     * @param imageId The ID of the image to retrieve
+     * @param address Optional omg.lol address (defaults to authenticated address)
+     * @returns Image metadata including URL, MIME type, dimensions, etc.
+     */
+    async getSomePicsImage(imageId: string, address?: string): Promise<SomePicsMetadata> {
+        try {
+            const targetAddress = address || await this.authManager.getAddress();
+            if (!targetAddress) {
+                throw this.errorHandler.createError(
+                    ErrorType.AUTHENTICATION,
+                    ErrorSeverity.HIGH,
+                    'No address found',
+                    'Please authenticate first'
+                );
+            }
+
+            this.logger.info('Retrieving some.pics image', {
+                address: targetAddress,
+                imageId
+            });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/address/${targetAddress}/pics/${imageId}`, {
+                    method: 'GET',
+                    headers: await this.getHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<SomePicsGetResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to retrieve image');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.pic) {
+                throw new Error('Failed to retrieve image');
+            }
+
+            this.logger.info('Image retrieved successfully', { imageId });
+
+            return apiResponse.response.pic as SomePicsMetadata;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getSomePicsImage',
+                address,
+                imageId
             });
             throw error;
         }

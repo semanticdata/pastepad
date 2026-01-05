@@ -8,7 +8,9 @@ import { initializeServices } from '../services';
 interface MockResponse {
     ok: boolean;
     status?: number;
+    statusText?: string;
     json: () => Promise<any>;
+    text?: () => Promise<string>;
 }
 
 interface FetchCall {
@@ -319,3 +321,235 @@ suite('API Visibility Preservation Tests', () => {
         assert.strictEqual(fetchCalls[0].options.method, 'DELETE', 'Should use DELETE method');
     });
 });
+
+suite('some.pics API Tests', () => {
+    let api: OmgLolApi;
+    let authManager: AuthenticationManager;
+    let mockContext: any;
+
+    setup(async () => {
+        // Reset mock state
+        mockFetchResponses = [];
+        fetchCalls = [];
+        responseIndex = 0;
+
+        // Create mock context (same as existing setup)
+        const mockWorkspaceState = {
+            _data: {} as Record<string, any>,
+            get: function(this: any, key: string, defaultValue?: any) {
+                return this._data[key] !== undefined ? this._data[key] : defaultValue;
+            },
+            update: function(this: any, key: string, value: any) {
+                this._data[key] = value;
+                return Promise.resolve();
+            }
+        };
+
+        mockContext = {
+            subscriptions: [],
+            workspaceState: mockWorkspaceState,
+            secrets: {
+                get: () => Promise.resolve(undefined),
+                store: () => Promise.resolve(),
+                delete: () => Promise.resolve()
+            }
+        };
+
+        initializeServices(mockContext);
+        authManager = new AuthenticationManager(mockContext);
+        api = new OmgLolApi(authManager);
+
+        authManager.getAddress = async () => 'testuser';
+        authManager.getAccessToken = async () => 'test-token';
+    });
+
+    test('should upload image successfully', async () => {
+        // Mock file system
+        const fs = require('fs');
+        const mockImageBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP6DwABPQDQEBIY4AAAAABJRU5ErkJggg==', 'base64');
+
+        // Stub fs.readFile and fs.stat
+        const originalReadFile = fs.promises.readFile;
+        const originalStat = fs.promises.stat;
+
+        fs.promises.readFile = async () => mockImageBuffer;
+        fs.promises.stat = async () => ({ size: 1024 });
+
+        try {
+            mockFetchResponses = [{
+                ok: true,
+                json: async () => ({
+                    request: { success: true, status_code: 200 },
+                    response: {
+                        message: "Upload successful.",
+                        id: "123456789",
+                        url: "https://some.pics/image/123456789"
+                    }
+                })
+            }];
+
+            const result = await api.uploadToSomePics('/path/to/image.png', 'test-tag');
+
+            assert.strictEqual(result.id, '123456789');
+            assert.strictEqual(result.url, 'https://some.pics/image/123456789');
+
+            // Verify fetch was called with correct parameters
+            assert.strictEqual(fetchCalls.length, 1);
+            assert.strictEqual(fetchCalls[0].url, 'https://api.omg.lol/address/testuser/pics/upload');
+            assert.strictEqual(fetchCalls[0].options.method, 'POST');
+            assert.strictEqual(fetchCalls[0].options.headers['Content-Type'], 'application/json');
+
+            // Verify payload has Base64 data (not multipart)
+            const body = JSON.parse(fetchCalls[0].options.body);
+            assert.strictEqual(typeof body.pic, 'string');
+            assert.ok(body.pic.length > 0);
+            assert.strictEqual(body.tags, 'test-tag');
+
+        } finally {
+            fs.promises.readFile = originalReadFile;
+            fs.promises.stat = originalStat;
+        }
+    });
+
+    test('should reject file larger than 5MB', async () => {
+        const fs = require('fs');
+        const originalStat = fs.promises.stat;
+
+        fs.promises.stat = async () => ({ size: 6 * 1024 * 1024 }); // 6MB
+
+        try {
+            // Mock handleError to prevent timeout from vscode.showErrorMessage
+            const originalHandleError = api['errorHandler'].handleError;
+            api['errorHandler'].handleError = async () => {};
+
+            try {
+                await api.uploadToSomePics('/path/to/large.png');
+                assert.fail('Should have thrown an error');
+            } finally {
+                api['errorHandler'].handleError = originalHandleError;
+            }
+        } catch (error: any) {
+            assert.ok(error.message.includes('File too large'));
+        } finally {
+            fs.promises.stat = originalStat;
+        }
+    });
+
+    test('should reject invalid file type', async () => {
+        const fs = require('fs');
+        const originalStat = fs.promises.stat;
+
+        fs.promises.stat = async () => ({ size: 1024 });
+
+        try {
+            // Mock handleError to prevent timeout from vscode.showErrorMessage
+            const originalHandleError = api['errorHandler'].handleError;
+            api['errorHandler'].handleError = async () => {};
+
+            try {
+                await api.uploadToSomePics('/path/to/document.pdf');
+                assert.fail('Should have thrown an error');
+            } finally {
+                api['errorHandler'].handleError = originalHandleError;
+            }
+        } catch (error: any) {
+            assert.ok(error.message.includes('Invalid file type'));
+        } finally {
+            fs.promises.stat = originalStat;
+        }
+    });
+
+    test('should update image metadata', async () => {
+        mockFetchResponses = [{
+            ok: true,
+            json: async () => ({
+                request: { success: true, status_code: 200 },
+                response: { message: "Metadata updated." }
+            })
+        }];
+
+        await api.updateSomePicsMetadata('123456789', {
+            alt_text: 'Test image',
+            description: 'Uploaded via VS Code',
+            tags: 'vscode,test',
+            hide_from_public: false
+        });
+
+        assert.strictEqual(fetchCalls.length, 1);
+        assert.strictEqual(fetchCalls[0].url, 'https://api.omg.lol/address/testuser/pics/123456789');
+        assert.strictEqual(fetchCalls[0].options.method, 'PUT');
+
+        const body = JSON.parse(fetchCalls[0].options.body);
+        assert.strictEqual(body.alt_text, 'Test image');
+        assert.strictEqual(body.description, 'Uploaded via VS Code');
+        assert.strictEqual(body.tags, 'vscode,test');
+        assert.strictEqual(body.hide_from_public, false);
+    });
+
+    test('should retrieve image details', async () => {
+        mockFetchResponses = [{
+            ok: true,
+            json: async () => ({
+                request: { success: true, status_code: 200 },
+                response: {
+                    message: "Image retrieved.",
+                    pic: {
+                        id: "123456789",
+                        address: "testuser",
+                        url: "https://some.pics/image/123456789",
+                        created: "1704499200",
+                        mime: "image/png",
+                        alt_text: "Test image",
+                        width: 800,
+                        height: 600
+                    }
+                }
+            })
+        }];
+
+        const result = await api.getSomePicsImage('123456789');
+
+        assert.strictEqual(result.id, '123456789');
+        assert.strictEqual(result.mime, 'image/png');
+        assert.strictEqual(result.alt_text, 'Test image');
+        assert.strictEqual(fetchCalls[0].options.method, 'GET');
+    });
+
+    test('should handle upload error response', async () => {
+        const fs = require('fs');
+        const mockImageBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP6DwABPQDQEBIY4AAAAABJRU5ErkJggg==', 'base64');
+
+        const originalReadFile = fs.promises.readFile;
+        const originalStat = fs.promises.stat;
+
+        fs.promises.readFile = async () => mockImageBuffer;
+        fs.promises.stat = async () => ({ size: 1024 });
+
+        try {
+            // Mock handleError to prevent timeout from vscode.showErrorMessage
+            const originalHandleError = api['errorHandler'].handleError;
+            api['errorHandler'].handleError = async () => {};
+
+            try {
+                mockFetchResponses = [{
+                    ok: false,
+                    status: 413,
+                    statusText: 'Payload Too Large',
+                    json: async () => ({}),
+                    text: async () => 'Payload Too Large'
+                }];
+
+                await api.uploadToSomePics('/path/to/image.png');
+                assert.fail('Should have thrown an error');
+            } finally {
+                api['errorHandler'].handleError = originalHandleError;
+            }
+        } catch (error: any) {
+            assert.ok(error.message.includes('HTTP 413'));
+        } finally {
+            fs.promises.readFile = originalReadFile;
+            fs.promises.stat = originalStat;
+        }
+    });
+});
+
