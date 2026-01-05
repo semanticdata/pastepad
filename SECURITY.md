@@ -27,6 +27,15 @@ Email security issues to: [database@omg.lol](mailto:database@omg.lol)
 - Local cache uses VS Code's workspace state
 - Paste content is not logged
 
+**Your Images (some.pics)**
+
+- Images uploaded to some.pics are Base64-encoded and transmitted via HTTPS
+- File size validation enforced (5MB limit) to prevent excessive resource usage
+- File type validation restricted to PNG, JPG, GIF, WebP formats
+- Image content never logged or cached locally
+- Temporary files read from disk for upload and immediately discarded
+- No image processing or modification beyond Base64 encoding
+
 **Network Security**
 
 - All API requests use HTTPS

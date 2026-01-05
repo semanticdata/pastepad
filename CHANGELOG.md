@@ -33,6 +33,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Weblog entry management: list, get, create, delete, and latest post retrieval
 - Weblog configuration management: get and update weblog settings
 - Weblog template management: get and update custom HTML templates
+- Complete some.pics API implementation (3 endpoints) for image hosting
+  - `uploadToSomePics(filePath, tags?, address?)` - Upload images with Base64 encoding
+  - `updateSomePicsMetadata(imageId, metadata, address?)` - Update alt text, description, tags, visibility
+  - `getSomePicsImage(imageId, address?)` - Retrieve image metadata
+- Image upload validation (5MB limit, PNG/JPG/GIF/WebP support)
+- Test suite covering some.pics API (6 tests)
 - some.pics API discovery documentation for future picture sharing features
 - FileSystemProvider for `omgprofile:` and `omgnow:` schemes
 - Automatic 404 handling for profiles and /now pages that don't exist yet
