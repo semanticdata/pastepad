@@ -801,11 +801,12 @@ export class OmgLolApi {
                 return response.json() as Promise<UploadProfilePictureResponse>;
             });
 
-            if (!result.request.success) {
-                throw new Error(result.response.message || 'Failed to upload profile picture');
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to upload profile picture');
             }
 
-            const message = result.response.message;
+            const apiResponse = result.result as any;
+            const message = apiResponse.response.message;
             this.logger.info('Profile picture uploaded successfully', { message });
 
             // Invalidate profile cache to force refresh
@@ -887,15 +888,20 @@ export class OmgLolApi {
                 return response.json() as Promise<GetWeblogEntriesResponse>;
             });
 
-            if (!result.request.success || !result.response.entries) {
+            if (!result.success || !result.result) {
+                return [];
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.entries) {
                 return [];
             }
 
             this.logger.info('Weblog entries retrieved successfully', {
-                count: result.response.entries.length
+                count: apiResponse.response.entries.length
             });
 
-            return result.response.entries;
+            return apiResponse.response.entries;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -938,13 +944,18 @@ export class OmgLolApi {
                 return response.json() as Promise<GetWeblogEntryResponse>;
             });
 
-            if (!result.request.success || !result.response.entry) {
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to retrieve weblog entry');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.entry) {
                 throw new Error('Failed to retrieve weblog entry');
             }
 
             this.logger.info('Weblog entry retrieved successfully', { entryId });
 
-            return result.response.entry;
+            return apiResponse.response.entry;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -976,13 +987,18 @@ export class OmgLolApi {
                 return response.json() as Promise<GetWeblogEntryResponse>;
             });
 
-            if (!result.request.success || !result.response.entry) {
+            if (!result.success || !result.result) {
+                return null;
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.entry) {
                 return null;
             }
 
             this.logger.info('Latest weblog post retrieved successfully');
 
-            return result.response.entry;
+            return apiResponse.response.entry;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -1027,8 +1043,13 @@ export class OmgLolApi {
                 return response.json() as Promise<CreateWeblogEntryResponse>;
             });
 
-            if (!result.request.success || !result.response.entry) {
-                throw new Error(result.response.message || 'Failed to create weblog entry');
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to create weblog entry');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.entry) {
+                throw new Error(apiResponse.response.message || 'Failed to create weblog entry');
             }
 
             this.logger.info('Weblog entry created successfully', { entryId });
@@ -1036,7 +1057,7 @@ export class OmgLolApi {
             // Invalidate weblog cache
             await this.cacheManager.invalidate('weblog');
 
-            return result.response.entry;
+            return apiResponse.response.entry;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -1081,8 +1102,13 @@ export class OmgLolApi {
                 return response.json() as Promise<DeleteWeblogEntryResponse>;
             });
 
-            if (!result.request.success) {
-                throw new Error(result.response.message || 'Failed to delete weblog entry');
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to delete weblog entry');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success) {
+                throw new Error(apiResponse.response.message || 'Failed to delete weblog entry');
             }
 
             this.logger.info('Weblog entry deleted successfully', { entryId });
@@ -1132,13 +1158,18 @@ export class OmgLolApi {
                 return response.json() as Promise<GetWeblogConfigurationResponse>;
             });
 
-            if (!result.request.success || !result.response.configuration) {
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to retrieve weblog configuration');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.configuration) {
                 throw new Error('Failed to retrieve weblog configuration');
             }
 
             this.logger.info('Weblog configuration retrieved successfully');
 
-            return result.response.configuration;
+            return apiResponse.response.configuration;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -1183,8 +1214,13 @@ export class OmgLolApi {
                 return response.json() as Promise<UpdateWeblogConfigurationResponse>;
             });
 
-            if (!result.request.success) {
-                throw new Error(result.response.message || 'Failed to update weblog configuration');
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to update weblog configuration');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success) {
+                throw new Error(apiResponse.response.message || 'Failed to update weblog configuration');
             }
 
             this.logger.info('Weblog configuration updated successfully');
@@ -1234,13 +1270,18 @@ export class OmgLolApi {
                 return response.json() as Promise<GetWeblogTemplateResponse>;
             });
 
-            if (!result.request.success || !result.response.template) {
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to retrieve weblog template');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.template) {
                 throw new Error('Failed to retrieve weblog template');
             }
 
             this.logger.info('Weblog template retrieved successfully');
 
-            return result.response.template;
+            return apiResponse.response.template;
 
         } catch (error) {
             await this.errorHandler.handleError(error as Error, {
@@ -1285,8 +1326,13 @@ export class OmgLolApi {
                 return response.json() as Promise<UpdateWeblogTemplateResponse>;
             });
 
-            if (!result.request.success) {
-                throw new Error(result.response.message || 'Failed to update weblog template');
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to update weblog template');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success) {
+                throw new Error(apiResponse.response.message || 'Failed to update weblog template');
             }
 
             this.logger.info('Weblog template updated successfully');

@@ -21,6 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - File size validation (5MB limit) for profile picture uploads
 - Progress indicators during profile picture upload
 - Complete weblog API implementation (9 endpoints) for future weblog features
+  - `getWeblogEntries()` - List all weblog entries
+  - `getWeblogEntry(entryId)` - Retrieve specific weblog entry
+  - `getLatestWeblogPost(address)` - Retrieve latest weblog post (no auth required)
+  - `createWeblogEntry(entryId, content)` - Create new weblog entry
+  - `deleteWeblogEntry(entryId)` - Delete weblog entry
+  - `getWeblogConfiguration()` - Retrieve weblog configuration/settings
+  - `updateWeblogConfiguration(configuration)` - Update weblog configuration
+  - `getWeblogTemplate()` - Retrieve custom HTML template
+  - `updateWeblogTemplate(template)` - Update custom HTML template
 - Weblog entry management: list, get, create, delete, and latest post retrieval
 - Weblog configuration management: get and update weblog settings
 - Weblog template management: get and update custom HTML templates
