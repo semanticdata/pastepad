@@ -13,8 +13,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:pastepad.pastebin",
-    "onUri"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "bugs": {
@@ -27,7 +26,9 @@
     "snippet",
     "code sharing",
     "paste",
-    "clipboard"
+    "clipboard",
+    "profile",
+    "now page"
   ],
   "contributes": {
     "commands": [
@@ -92,6 +93,36 @@
       {
         "command": "pastepad.showPasteStats",
         "title": "%commands.showPasteStats.title%"
+      },
+      {
+        "command": "pastepad.openProfile",
+        "title": "PastePad: Open Profile",
+        "icon": "$(account)"
+      },
+      {
+        "command": "pastepad.openNowPage",
+        "title": "PastePad: Open /Now Page",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "pastepad.previewProfile",
+        "title": "PastePad: Toggle Profile Preview",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "pastepad.publishProfile",
+        "title": "PastePad: Publish Profile",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "pastepad.openProfileInBrowser",
+        "title": "PastePad: View in Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "pastepad.uploadProfilePicture",
+        "title": "PastePad: Upload Profile Picture",
+        "icon": "$(file-image)"
       }
     ],
     "views": {
@@ -101,6 +132,13 @@
           "name": "%views.pastepad.pastebin.name%",
           "when": "true"
         }
+      ],
+      "pastepad-profiles": [
+        {
+          "id": "pastepad.profiles",
+          "name": "%views.pastepad.profiles.name%",
+          "when": "pastepad.authenticated"
+        }
       ]
     },
     "viewsContainers": {
@@ -109,6 +147,11 @@
           "id": "pastepad",
           "title": "%displayName%",
           "icon": "$(file-text)"
+        },
+        {
+          "id": "pastepad-profiles",
+          "title": "%viewsContainers.pastepad.profiles.title%",
+          "icon": "$(home)"
         }
       ]
     },
@@ -126,6 +169,16 @@
             "%configuration.properties.logLevel.enumDescriptions.warn%",
             "%configuration.properties.logLevel.enumDescriptions.error%"
           ]
+        },
+        "pastepad.profile.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.properties.profile.autoSync.description%"
+        },
+        "pastepad.profile.previewOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.properties.profile.previewOnOpen.description%"
         }
       }
     },
@@ -149,6 +202,11 @@
         {
           "command": "pastepad.newPaste",
           "when": "view == pastepad.pastebin && pastepad.authenticated",
+          "group": "navigation"
+        },
+        {
+          "command": "pastepad.previewProfile",
+          "when": "view == pastepad.profiles && pastepad.authenticated",
           "group": "navigation"
         }
       ],
@@ -204,6 +262,16 @@
           "command": "pastepad.forceSync",
           "when": "pastepad.isPasteDocument && pastepad.authenticated && pastepad.hasUnsyncedChanges",
           "group": "navigation@2"
+        },
+        {
+          "command": "pastepad.previewProfile",
+          "when": "(pastepad.isProfileDocument || pastepad.isNowPageDocument) && pastepad.authenticated",
+          "group": "navigation@1"
+        },
+        {
+          "command": "pastepad.openProfileInBrowser",
+          "when": "(pastepad.isProfileDocument || pastepad.isNowPageDocument) && pastepad.authenticated",
+          "group": "navigation@2"
         }
       ]
     },
@@ -217,6 +285,11 @@
         "command": "pastepad.forceSync",
         "key": "ctrl+shift+s",
         "when": "pastepad.isPasteDocument && pastepad.authenticated && pastepad.hasUnsyncedChanges"
+      },
+      {
+        "command": "pastepad.previewProfile",
+        "key": "ctrl+shift+v",
+        "when": "(pastepad.isProfileDocument || pastepad.isNowPageDocument) && pastepad.authenticated"
       }
     ]
   },
