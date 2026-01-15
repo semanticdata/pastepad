@@ -8,15 +8,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Profile management support for omg.lol profiles and /now pages
+- Profile and /now page tree view in activity bar (separate from pastebin view)
+- Open profile command (`pastepad.openProfile`) to edit main profile
+- Open /now page command (`pastepad.openNowPage`) to edit /now page
+- Live preview panel for profiles and /now pages with markdown rendering
+- Profile preview toggle command (`pastepad.previewProfile`) with `Ctrl+Shift+V` shortcut
+- Publish profile command (`pastepad.publishProfile`) to force save changes
+- View profile in browser command (`pastepad.openProfileInBrowser`)
+- Profile picture upload functionality (`pastepad.uploadProfilePicture`) with full multipart/form-data support
+- Support for PNG, JPG, GIF, WebP, SVG image formats for profile pictures
+- File size validation (5MB limit) for profile picture uploads
+- Progress indicators during profile picture upload
+- Complete weblog API implementation (9 endpoints) for future weblog features
+  - `getWeblogEntries()` - List all weblog entries
+  - `getWeblogEntry(entryId)` - Retrieve specific weblog entry
+  - `getLatestWeblogPost(address)` - Retrieve latest weblog post (no auth required)
+  - `createWeblogEntry(entryId, content)` - Create new weblog entry
+  - `deleteWeblogEntry(entryId)` - Delete weblog entry
+  - `getWeblogConfiguration()` - Retrieve weblog configuration/settings
+  - `updateWeblogConfiguration(configuration)` - Update weblog configuration
+  - `getWeblogTemplate()` - Retrieve custom HTML template
+  - `updateWeblogTemplate(template)` - Update custom HTML template
+- Weblog entry management: list, get, create, delete, and latest post retrieval
+- Weblog configuration management: get and update weblog settings
+- Weblog template management: get and update custom HTML templates
+- Complete some.pics API implementation (3 endpoints) for image hosting
+  - `uploadToSomePics(filePath, tags?, address?)` - Upload images with Base64 encoding
+  - `updateSomePicsMetadata(imageId, metadata, address?)` - Update alt text, description, tags, visibility
+  - `getSomePicsImage(imageId, address?)` - Retrieve image metadata
+- Image upload validation (5MB limit, PNG/JPG/GIF/WebP support)
+- Test suite covering some.pics API (6 tests)
+- some.pics API discovery documentation for future picture sharing features
+- FileSystemProvider for `omgprofile:` and `omgnow:` schemes
+- Automatic 404 handling for profiles and /now pages that don't exist yet
+- Support for omg.lol profile placeholders (`{profile-picture}`, `{address}`, `{last-updated}`)
+- Profile theme and styling support in preview panel
+- omg.lol theme API integration (`getTheme()`, `getThemePreviewHtml()`)
+- Fetch and apply actual omg.lol theme CSS to profile and /now page previews
+- Support for custom profile CSS and head content in previews
+- Context values (`pastepad.isProfileDocument`, `pastepad.isNowPageDocument`) for UI conditionals
 - View paste in browser command (opens `https://{address}.paste.lol/{title}`)
 - Test suite covering paste commands
 - Right-click context menu for paste items in tree view
 - Localization support with `package.nls.json` for better maintainability
 - Spanish localization support with `package.nls.es.json`
+- TypeScript interfaces for WeblogEntry, WeblogConfiguration, and WeblogTemplate
 
 ### Changed
 
+- Minimum VS Code version requirement reduced to 1.84.0 (from 1.107.1) for broader compatibility
+- Tests now run against VS Code 1.84.0 to ensure backward compatibility
+- Extension now activates on startup (`onStartupFinished`) instead of only when views are opened
+- Fixed profile API endpoint from `/address/{address}/profile` to `/address/{address}/web`
+- Fixed profile update API to include `publish: true` parameter
+- Now page API uses correct `listed` parameter format (`'1'` or `'0'` as strings)
+- Improved error handling for missing profiles and /now pages
+- Profile and /now page commands no longer use i18n placeholders for immediate visibility
 - Moved all user-facing strings to localization file per VS Code best practices
+- Improved profile cache invalidation after picture upload
+- Enhanced error handling for file operations with user-friendly messages
+
+### Fixed
+
+- Profile and /now pages now load correctly (previously returned 404 errors)
+- Profile preview panel displays correctly with proper data extraction
+- Profile update requests now use the correct API endpoint
+- File system providers properly handle empty content for new profiles/now pages
+- Profile and /now page preview now reliably opens in split view using `ViewColumn.Beside`
+- Preview panel placement is now dynamic and works correctly regardless of active editor column
+- Editor opens first in active column, establishing anchor for preview to appear beside it
+- Preview preserves focus in editor using `takeFocus: false` parameter
+- Completed stubbed profile picture upload command with full implementation
 
 ## [0.3.0] - 2026-01-03
 

@@ -15,7 +15,7 @@
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}",
+			"preLaunchTask": "compile",
 			"settings": {
 				"pastepad.logLevel": "debug"
 			}
@@ -29,6 +29,25 @@
 				"--disable-extensions",
 				"--extensionDevelopmentPath=${workspaceFolder}",
 				"--extensionTestsPath=${workspaceFolder}/out/test"
+			],
+			"outFiles": [
+				"${workspaceFolder}/out/test/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}",
+			"settings": {
+				"pastepad.logLevel": "debug"
+			}
+		},
+		{
+			"name": "Extension Tests (Min VS Code 1.84)",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+				"--disable-extensions",
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"--extensionTestsPath=${workspaceFolder}/out/test",
+				"--version=1.84.0"
 			],
 			"outFiles": [
 				"${workspaceFolder}/out/test/**/*.js"
