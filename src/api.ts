@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AuthenticationManager } from './authentication';
-import { PasteItem, ProfileData, NowPageData, WeblogEntry, WeblogConfiguration, WeblogTemplate, SomePicsUploadResponse, SomePicsUpdateResponse, SomePicsGetResponse, SomePicsMetadata } from './types';
+import { PasteItem, ProfileData, NowPageData, WeblogEntry, WeblogConfiguration, WeblogTemplate, SomePicsUploadResponse, SomePicsUpdateResponse, SomePicsGetResponse, SomePicsMetadata, ThemeData, ThemeInfoResponse, ThemePreviewCss, ThemePreviewResponse } from './types';
 import { ErrorHandler, RetryManager, CacheManager, StateManager, ErrorType, ErrorSeverity, LoggerService } from './services';
 
 const API_URL = 'https://api.omg.lol';
@@ -1591,6 +1591,110 @@ export class OmgLolApi {
                 operation: 'getSomePicsImage',
                 address,
                 imageId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Retrieve information about a specific theme
+     * @param themeId The theme ID (e.g., 'default', 'cherry-blossom', 'dark', etc.)
+     * @returns Theme data including preview CSS
+     */
+    async getTheme(themeId: string): Promise<ThemeData | undefined> {
+        try {
+            this.logger.info('Fetching theme', { themeId });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/theme/${themeId}/info`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<ThemeInfoResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to fetch theme');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request.success || !apiResponse.response.theme) {
+                throw new Error('Failed to fetch theme');
+            }
+
+            this.logger.info('Theme fetched successfully', { themeId });
+
+            return apiResponse.response.theme as ThemeData;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getTheme',
+                themeId
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Parse the preview_css JSON string from a theme
+     * @param themeId The theme ID (e.g., 'default', 'cherry-blossom', 'dark', etc.)
+     * @returns Parsed CSS properties for background, text, links, and icons
+     */
+    async getThemePreviewCss(themeId: string): Promise<ThemePreviewCss | undefined> {
+        try {
+            const theme = await this.getTheme(themeId);
+            if (!theme?.preview_css) {
+                return undefined;
+            }
+
+            // The preview_css is a JSON string
+            const parsedCss = JSON.parse(theme.preview_css) as ThemePreviewCss;
+            return parsedCss;
+
+        } catch (error) {
+            this.logger.warn('Failed to parse theme preview CSS, using defaults', { themeId, error });
+            return undefined;
+        }
+    }
+
+    /**
+     * Fetch the HTML preview for a theme - this returns the actual styled HTML from omg.lol
+     * @param themeId The theme ID (e.g., 'default', 'cherry-blossom', 'dark', etc.)
+     * @returns The HTML response containing the styled theme preview
+     */
+    async getThemePreviewHtml(themeId: string): Promise<ThemePreviewResponse | undefined> {
+        try {
+            this.logger.info('Fetching theme preview HTML', { themeId });
+
+            const result = await this.retryManager.retryApiCall(async () => {
+                const response = await fetch(`${API_URL}/theme/${themeId}/preview`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json() as Promise<ThemePreviewResponse>;
+            });
+
+            if (!result.success || !result.result) {
+                throw result.error || new Error('Failed to fetch theme preview HTML');
+            }
+
+            const apiResponse = result.result as any;
+            if (!apiResponse.request?.success || !apiResponse.response?.html) {
+                throw new Error('Failed to fetch theme preview HTML');
+            }
+
+            this.logger.info('Theme preview HTML fetched successfully', { themeId });
+
+            return apiResponse as ThemePreviewResponse;
+
+        } catch (error) {
+            await this.errorHandler.handleError(error as Error, {
+                operation: 'getThemePreviewHtml',
+                themeId
             });
             throw error;
         }

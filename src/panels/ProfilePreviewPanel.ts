@@ -119,15 +119,23 @@ export class ProfilePreviewPanel {
 
             // Fetch profile data to get theme information
             let profileData;
+            let themeId = 'default'; // Default theme
+            let customCss = '';
+            let customHead = '';
+
             try {
-                profileData = isNowPage
-                    ? await this.api.getNowPage()
-                    : await this.api.getProfile();
+                // Always fetch profile to get the theme ID and custom CSS
+                profileData = await this.api.getProfile();
+                themeId = (profileData as any)?.theme || 'default';
+                customCss = (profileData as any)?.css || '';
+                customHead = (profileData as any)?.head || '';
+
+                this.logger.debug('Fetched profile theme', { themeId, hasCustomCss: !!customCss, hasCustomHead: !!customHead });
             } catch (error) {
                 this.logger.warn('Could not fetch profile data, using default theme', { error });
             }
 
-            const html = this.getHtmlForWebview(previewContent, address || '', profileData, isNowPage);
+            const html = await this.getHtmlForWebview(previewContent, address, themeId, isNowPage, customCss, customHead);
             this.panel.webview.html = html;
         } catch (error) {
             this.logger.error('Failed to update preview', { error });
@@ -135,144 +143,84 @@ export class ProfilePreviewPanel {
         }
     }
 
-    private getHtmlForWebview(
+    private async getHtmlForWebview(
         content: string,
         address: string,
-        profileData?: any,
-        isNowPage: boolean = false
-    ): string {
+        themeId: string,
+        isNowPage: boolean,
+        customCss: string,
+        customHead: string
+    ): Promise<string> {
         const nonce = this.getNonce();
 
-        // Basic omg.lol styling (using default theme)
-        const themeCss = this.getThemeCss();
+        // Fetch the theme preview HTML to extract the stylesheet link
+        let stylesheetUrl = 'https://static.omg.lol/profiles/themes/css/base.css?v=20220807';
+        let themeStyleTag = '';
+
+        try {
+            const themePreview = await this.api.getThemePreviewHtml(themeId);
+            if (themePreview?.response?.html) {
+                // Extract the stylesheet link from the HTML
+                const linkMatch = themePreview.response.html.match(/<link href="([^"]+)" rel="stylesheet">/);
+                if (linkMatch && linkMatch[1]) {
+                    stylesheetUrl = linkMatch[1];
+                }
+
+                // Also try to extract inline styles from the body tag for themes that have them
+                const bodyStyleMatch = themePreview.response.html.match(/<body style="([^"]+)">/);
+                if (bodyStyleMatch && bodyStyleMatch[1]) {
+                    themeStyleTag = bodyStyleMatch[1];
+                }
+            }
+        } catch (error) {
+            this.logger.warn('Could not fetch theme preview HTML, using default stylesheet', { error });
+        }
 
         // Process content - replace placeholders and render markdown
-        const processedContent = this.processContent(content, address, profileData);
+        const processedContent = this.processContent(content, address);
 
         const title = isNowPage ? `/now - ${address}` : `${address} - Profile`;
 
+        // Build the HTML using omg.lol's actual structure and stylesheet
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; script-src 'nonce-${nonce}';">
     <title>${title}</title>
+    <link href="${stylesheetUrl}" rel="stylesheet">
+    ${customHead}
     <style>
-        ${themeCss}
         body {
+            ${themeStyleTag}
             padding: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
         }
-        .preview-header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-        .preview-header h1 {
-            margin: 0 0 10px 0;
-        }
-        .preview-header .meta {
-            color: #666;
-            font-size: 0.9em;
-        }
-        .preview-content {
-            line-height: 1.8;
-        }
-        .preview-content h1,
-        .preview-content h2,
-        .preview-content h3 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-        }
-        .preview-content p {
-            margin-bottom: 1em;
-        }
-        .preview-content ul,
-        .preview-content ol {
-            margin-bottom: 1em;
-            padding-left: 2em;
-        }
-        .preview-content a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        .preview-content a:hover {
-            text-decoration: underline;
-        }
-        .preview-content code {
-            background: #f4f4f4;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-        .preview-content pre {
-            background: #f4f4f4;
-            padding: 15px;
+        .preview-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
             border-radius: 5px;
-            overflow-x: auto;
+            font-size: 12px;
+            z-index: 1000;
         }
-        .preview-content pre code {
-            background: none;
-            padding: 0;
-        }
-        .preview-footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-        }
+        /* Custom CSS from profile */
+        ${customCss}
     </style>
 </head>
 <body>
-    <div class="preview-header">
-        <h1>${isNowPage ? `/now - ${address}` : address}</h1>
-        <div class="meta">Live Preview</div>
-    </div>
-    <div class="preview-content">
+    <div class="preview-indicator">Live Preview - ${new Date().toLocaleString()}</div>
+    <main>
         ${processedContent}
-    </div>
-    <div class="preview-footer">
-        Preview - ${new Date().toLocaleString()}
-    </div>
+    </main>
 </body>
 </html>`;
     }
 
-    private getThemeCss(): string {
-        // Default omg.lol theme CSS
-        return `
-            body {
-                background: linear-gradient(0deg, #3fb6b6 0%, #d56b86 100%);
-                background-repeat: no-repeat;
-                background-attachment: fixed;
-                color: #000;
-            }
-            .preview-content {
-                background: rgba(255, 255, 255, 0.95);
-                padding: 30px;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-        `;
-    }
-
-    private processContent(content: string, address: string, profileData?: any): string {
-        // Replace omg.lol placeholders
+    private processContent(content: string, address: string): string {
         let processed = content;
-
-        // Replace {profile-picture}
-        if (profileData?.pfp) {
-            processed = processed.replace(/\{profile-picture\}/g, `<img src="${profileData.pfp}" alt="Profile Picture" style="max-width: 150px; border-radius: 50%; display: block; margin: 20px auto;">`);
-        } else {
-            processed = processed.replace(/\{profile-picture\}/g, '');
-        }
 
         // Replace {address}
         processed = processed.replace(/\{address\}/g, address);
@@ -280,6 +228,10 @@ export class ProfilePreviewPanel {
         // Replace {last-updated}
         const now = new Date().toLocaleString();
         processed = processed.replace(/\{last-updated\}/g, now);
+
+        // Replace {profile-picture} with empty string for now
+        // In the future we could fetch and display the actual profile picture
+        processed = processed.replace(/\{profile-picture\}/g, '');
 
         // Simple markdown-like processing
         // Headers
@@ -296,13 +248,13 @@ export class ProfilePreviewPanel {
         processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>');
 
         // Images
-        processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/gim, '<img src="$2" alt="$1" style="max-width: 100%;">');
+        processed = processed.replace(/!\[([^\]]*)\]\(([^)]+)\)/gim, '<img src="$2" alt="$1">');
 
         // Line breaks and paragraphs
         processed = processed.replace(/\n\n/g, '</p><p>');
         processed = processed.replace(/\n/g, '<br>');
 
-        return `<p>${processed}</p>`;
+        return `<div id="bio"><p>${processed}</p></div>`;
     }
 
     private getErrorHtml(message: string): string {

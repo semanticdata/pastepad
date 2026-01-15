@@ -44,6 +44,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Automatic 404 handling for profiles and /now pages that don't exist yet
 - Support for omg.lol profile placeholders (`{profile-picture}`, `{address}`, `{last-updated}`)
 - Profile theme and styling support in preview panel
+- omg.lol theme API integration (`getTheme()`, `getThemePreviewHtml()`)
+- Fetch and apply actual omg.lol theme CSS to profile and /now page previews
+- Support for custom profile CSS and head content in previews
 - Context values (`pastepad.isProfileDocument`, `pastepad.isNowPageDocument`) for UI conditionals
 - View paste in browser command (opens `https://{address}.paste.lol/{title}`)
 - Test suite covering paste commands

@@ -119,3 +119,59 @@ export interface SomePicsGetResponse {
 		pic?: SomePicsMetadata;
 	};
 }
+
+// Theme types
+export interface ThemeData {
+	id: string;
+	name: string;
+	created: string;
+	updated: string;
+	author: string;
+	author_url: string;
+	version: string;
+	license: string;
+	description: string;
+	preview_css: string;
+	sample_profile: string;
+}
+
+export interface ThemeListResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		message: string;
+		themes: {
+			[key: string]: ThemeData;
+		};
+	};
+}
+
+export interface ThemeInfoResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		theme: ThemeData;
+	};
+}
+
+export interface ThemePreviewCss {
+	background_css: string;
+	text_css: string;
+	link_css: string;
+	icon_css: string;
+}
+
+export interface ThemePreviewResponse {
+	request: {
+		status_code: number;
+		success: boolean;
+	};
+	response: {
+		message: string;
+		html: string;
+	};
+}
